@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import { z } from 'zod';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { GameTemplate } from '../models/GameTemplate.js';
@@ -56,6 +57,10 @@ router.post('/', requireRole('admin'), async (req, res) => {
 });
 
 router.put('/:id', requireRole('admin'), async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    return res.status(400).json({ error: 'Invalid game id' });
+  }
+
   const parsed = gameSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: 'Invalid game payload', details: parsed.error.flatten() });
@@ -75,6 +80,10 @@ router.put('/:id', requireRole('admin'), async (req, res) => {
 });
 
 router.post('/:id/publish', requireRole('admin'), async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    return res.status(400).json({ error: 'Invalid game id' });
+  }
+
   const game = await GameTemplate.findOne({ _id: req.params.id, adminId: req.user.id });
   if (!game) {
     return res.status(404).json({ error: 'Game not found' });

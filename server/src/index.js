@@ -1,9 +1,9 @@
-import mongoose from 'mongoose';
 import { app } from './app.js';
 import { env } from './config/env.js';
+import { connectMongoWithRetry } from './config/db.js';
 
 async function bootstrap() {
-  await mongoose.connect(env.mongoUri);
+  await connectMongoWithRetry();
   app.listen(env.port, () => {
     console.log(`Server listening on http://localhost:${env.port}`);
   });
