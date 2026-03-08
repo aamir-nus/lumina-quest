@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { env } from '../config/env.js';
+import { logger } from '../utils/logger.js';
 import {
   recordFallback,
   recordMockResponse,
@@ -46,7 +47,10 @@ function parseOutput(response, fallback = {}) {
 
   try {
     return JSON.parse(outputText);
-  } catch {
+  } catch (error) {
+    logger.warn('Failed to parse LLM JSON output; using fallback', {
+      message: error.message
+    });
     return fallback;
   }
 }
@@ -150,7 +154,8 @@ export async function classifyRoute({ gameTitle, sceneNarrative, input, avenues,
       wildcard: parsed.wildcard || null,
       providerResponse: response
     };
-  } catch {
+  } catch (error) {
+    logger.error('Classifier provider call failed', { message: error.message });
     recordProviderError();
     recordMockResponse();
     recordRouteType(heuristic.routeType);
@@ -207,7 +212,8 @@ export async function generateNarration({
 
     const parsed = parseOutput(response, { text: fallbackText });
     return { text: parsed.text || fallbackText, providerResponse: response };
-  } catch {
+  } catch (error) {
+    logger.error('Narration provider call failed', { message: error.message });
     recordProviderError();
     recordMockResponse();
     return {

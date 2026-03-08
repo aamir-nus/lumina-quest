@@ -1,4 +1,5 @@
 import { env } from '../config/env.js';
+import { logger } from '../utils/logger.js';
 
 const traces = [];
 
@@ -73,7 +74,7 @@ async function pushLangfuseTrace(trace) {
         ]
       })
     });
-  } catch {
-    // Tracing must never block gameplay.
+  } catch (error) {
+    logger.warn('Failed to push trace to Langfuse sink', { message: error.message });
   }
 }

@@ -6,33 +6,35 @@ import { PlayerSession } from '../models/PlayerSession.js';
 import { analyzeGameGraph } from '../services/sceneGraphAnalysisService.js';
 import { getResolverMetrics } from '../services/resolverMetricsService.js';
 import { getRecentTraces } from '../services/traceService.js';
+import { ApiError } from '../errors/ApiError.js';
+import { asyncHandler } from '../middleware/asyncHandler.js';
 
 const router = express.Router();
 
 router.use(requireAuth, requireRole('admin'));
 
-router.post('/games/:gameId/analyze', async (req, res) => {
+router.post('/games/:gameId/analyze', asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.gameId)) {
-    return res.status(400).json({ error: 'Invalid game id' });
+    throw new ApiError(400, 'INVALID_GAME_ID', 'Invalid game id');
   }
 
   const game = await GameTemplate.findOne({ _id: req.params.gameId, adminId: req.user.id }).lean();
   if (!game) {
-    return res.status(404).json({ error: 'Game not found' });
+    throw new ApiError(404, 'GAME_NOT_FOUND', 'Game not found');
   }
 
   const analysis = analyzeGameGraph(game);
   return res.json(analysis);
-});
+}));
 
-router.post('/games/:gameId/playtest', async (req, res) => {
+router.post('/games/:gameId/playtest', asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.gameId)) {
-    return res.status(400).json({ error: 'Invalid game id' });
+    throw new ApiError(400, 'INVALID_GAME_ID', 'Invalid game id');
   }
 
   const game = await GameTemplate.findOne({ _id: req.params.gameId, adminId: req.user.id });
   if (!game) {
-    return res.status(404).json({ error: 'Game not found' });
+    throw new ApiError(404, 'GAME_NOT_FOUND', 'Game not found');
   }
 
   const requestedScene = String(req.body?.startSceneId || '').trim();
@@ -53,13 +55,13 @@ router.post('/games/:gameId/playtest', async (req, res) => {
   });
 
   return res.status(201).json({ session });
-});
+}));
 
-router.get('/observability/resolver', async (_req, res) => {
+router.get('/observability/resolver', asyncHandler(async (_req, res) => {
   return res.json({
     metrics: getResolverMetrics(),
     traces: getRecentTraces(15)
   });
-});
+}));
 
 export default router;

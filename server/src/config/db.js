@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { env } from './env.js';
+import { logger } from '../utils/logger.js';
 
 const READY_STATE = {
   0: 'disconnected',
@@ -32,9 +33,11 @@ export async function connectMongoWithRetry() {
       return;
     } catch (error) {
       lastError = error;
-      console.error(
-        `[db] Mongo connect failed (attempt ${attempt}/${env.mongoConnectRetries}): ${error.message}`
-      );
+      logger.warn('Mongo connect failed', {
+        attempt,
+        retries: env.mongoConnectRetries,
+        message: error.message
+      });
       if (attempt < env.mongoConnectRetries) {
         await sleep(env.mongoConnectRetryDelayMs);
       }

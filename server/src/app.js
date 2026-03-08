@@ -6,22 +6,31 @@ import sessionRoutes from './routes/sessionRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import { env } from './config/env.js';
 import { getDbStatus } from './config/db.js';
+import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import { sanitizeInput } from './middleware/sanitizeInput.js';
+import { apiRateLimiter, authRateLimiter, securityHeaders } from './middleware/security.js';
 
 export const app = express();
+const api = express.Router();
 
+app.disable('x-powered-by');
+app.use(securityHeaders);
 app.use(cors({ origin: env.clientOrigin }));
-app.use(express.json());
+app.use(apiRateLimiter);
+app.use(express.json({ limit: env.requestJsonLimit }));
+app.use(sanitizeInput);
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true, service: 'lumina-quest-server', db: getDbStatus() });
 });
 
-app.use('/api/auth', authRoutes);
-app.use('/api/games', gameRoutes);
-app.use('/api/sessions', sessionRoutes);
-app.use('/api/admin', adminRoutes);
+api.use('/auth', authRateLimiter, authRoutes);
+api.use('/games', gameRoutes);
+api.use('/sessions', sessionRoutes);
+api.use('/admin', adminRoutes);
 
-app.use((err, _req, res, _next) => {
-  console.error(err);
-  res.status(500).json({ error: 'Internal server error' });
-});
+app.use('/api', api);
+app.use('/api/v1', api);
+
+app.use(notFoundHandler);
+app.use(errorHandler);
