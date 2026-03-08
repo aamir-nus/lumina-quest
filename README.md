@@ -2,67 +2,76 @@
 
 Turn-based MERN story engine where authored branches stay deterministic and LLMs map free-form player intent to valid avenues.
 
-## Project Context
+## Architecture
 
 ```mermaid
 flowchart LR
-  A["Admin Forge"] --> B["Scene Graph (Authored)"]
-  B --> C["Publish + Analysis"]
-  C --> D["Public + Draft Playtest Sessions"]
-  D --> E["Player Action"]
-  E --> F["Stage 1: Intent Classification"]
-  F --> G["Stage 2: Policy Validation (Avenue/Wildcard/Clarification)"]
-  G --> H["Stage 3: Narration + Persist + Explain"]
+  A["Admin Authored Graph"] --> B["Scene RenderConfig + Avenue VisualEffects"]
+  B --> C["Session Engine"]
+  C --> D["LLM Resolve (openrouter | lmstudio)"]
+  D --> E["Policy Validation"]
+  E --> F["Narration + Visual State Delta"]
+  F --> G["8-bit Stage + Transition Overlay + Ending Grade"]
 ```
 
 ## Iteration Status
 
 ```mermaid
 flowchart TD
-  I1["Iteration 1: Playable Story Engine MVP"] --> S1["Stable"]
-  I2["Iteration 2: Narrative Intelligence + Observability"] --> S2["Stable + Hardened"]
-  I3["Iteration 3: 8-Bit Visual Presentation"] --> S3["Blocked Until Hardening Complete"]
+  I1["Iteration 1"] --> S1["Stable"]
+  I2["Iteration 2"] --> S2["Stable + Hardened"]
+  I3["Iteration 3"] --> S3["Core Delivered"]
+  S3 --> N1["MLX Adapter Pending"]
+  S3 --> N2["WebGPU Adapter Pending"]
 ```
 
-## Hardening Gate
+## Run Locally
 
-Iteration 3 should not begin until hardening checks are complete. Current status is complete:
+1. `npm install`
+2. `cp .env.example .env`
+3. Set `JWT_SECRET` (24+ chars)
+4. `npm run mongo:up`
+5. `npm run dev`
+
+## LLM Provider Switch
+
+Environment variable:
+- `LLM_PROVIDER=openrouter` (external API)
+- `LLM_PROVIDER=lmstudio` (on-device local API, OpenAI-compatible)
+
+Provider config vars:
+- OpenRouter: `OPENROUTER_*`
+- LM Studio: `LMSTUDIO_BASE_URL`, `LMSTUDIO_API_KEY`, `LMSTUDIO_MODEL`
+
+## Docker (Lightweight, Multi-Arch)
+
+Server image build:
+```bash
+docker buildx build --platform linux/amd64 -f server/Dockerfile -t luminaquest-server:amd64 .
+docker buildx build --platform linux/arm64 -f server/Dockerfile -t luminaquest-server:arm64 .
+```
+
+Web image build:
+```bash
+docker buildx build --platform linux/amd64 -f web/Dockerfile -t luminaquest-web:amd64 .
+docker buildx build --platform linux/arm64 -f web/Dockerfile -t luminaquest-web:arm64 .
+```
+
+Single command multi-platform build (if pushing to a registry):
+```bash
+docker buildx build --platform linux/amd64,linux/arm64 -f server/Dockerfile -t <registry>/luminaquest-server:latest --push .
+docker buildx build --platform linux/amd64,linux/arm64 -f web/Dockerfile -t <registry>/luminaquest-web:latest --push .
+```
+
+Note:
+- In this sandbox, Docker daemon access may be unavailable; if so, run these commands on a host with Docker Engine running.
+
+## Key Docs
+
+- [Iteration Checklist](/Users/aamirsyedaltaf/Documents/lumina-quest/docs/ITERATION_CHECKLIST.md)
+- [Iteration 3 Execution](/Users/aamirsyedaltaf/Documents/lumina-quest/docs/ITERATION_3_EXECUTION.md)
+- [Iteration 3 Summary](/Users/aamirsyedaltaf/Documents/lumina-quest/docs/ITERATION_3_SUMMARY.md)
 - [Hardening Checklist](/Users/aamirsyedaltaf/Documents/lumina-quest/docs/ITERATION_2_HARDENING.md)
-
-## Entrypoints
-
-```mermaid
-flowchart LR
-  A["MongoDB"] --> B["Express API :4000"]
-  B --> C["React App :5173"]
-  C --> B
-```
-
-Setup:
-1. Install dependencies: `npm install`
-2. Configure env: copy `.env.example` to `.env`
-3. Set `JWT_SECRET` to a strong 24+ char secret
-4. Start MongoDB: `npm run mongo:up`
-5. Run API: `npm run dev:server`
-6. Run web app: `npm run dev:web`
-
-## Security & Reliability Defaults
-
-- Helmet security headers enabled
-- Rate limiting enabled (`/api` and stricter `/api/auth`)
-- Request payload sanitization and JSON body size limit enabled
-- Standardized structured API errors
-- Route async failures captured centrally
-- Frontend error boundary + safe localStorage wrappers
-
-## API Base Paths
-
-- `/api`
-- `/api/v1`
-
-See API quick reference:
 - [API Overview](/Users/aamirsyedaltaf/Documents/lumina-quest/docs/API.md)
-
-## Data Access Rule
-
-Frontend never connects directly to MongoDB. All persistence is backend-only.
+- [Admin Guide](/Users/aamirsyedaltaf/Documents/lumina-quest/for-admin.md)
+- [User Guide](/Users/aamirsyedaltaf/Documents/lumina-quest/for-user.md)

@@ -30,8 +30,12 @@
 - [x] Summarize Iteration 2 learnings/context for Iteration 3
 
 ## Iteration 3 - 8-bit Presentation Layer
-- [ ] Add scene render config and visual state deltas in backend
-- [ ] Build layered 8-bit stage components in frontend
-- [ ] Add stateful transition effects tied to avenue resolution
-- [ ] Add ending grading/cutscene views
-- [ ] Update README with final architecture and entrypoints
+- [x] Add scene render config and visual state deltas in backend
+- [x] Build layered 8-bit stage components in frontend
+- [x] Add stateful transition effects tied to avenue resolution
+- [x] Add ending grading/cutscene views
+- [x] Add config-driven provider switch (`openrouter` + `lmstudio`)
+- [x] Update README with final architecture and entrypoints
+- [ ] Validate Docker image builds end-to-end in current sandbox (blocked by daemon access)
+- [ ] Add MLX provider adapter (future)
+- [ ] Add WebGPU provider adapter (future)

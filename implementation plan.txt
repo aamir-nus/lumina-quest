@@ -47,16 +47,20 @@ Creative inputs can route through server-approved wildcard bridges without intro
 
 ------------------------------------------------------------
 
-Iteration 3 - 8-Bit Visual Presentation Layer
+Iteration 3 - 8-Bit Visual Presentation Layer (Delivered Core + Local Provider Switch)
 Objective:
 Transition from basic chat card gameplay to layered 8-bit story staging while preserving backend authority.
 
 Scope checklist:
-[ ] SceneRenderConfig and visual delta support in backend session updates
-[ ] Layered stage rendering components in React
-[ ] Pixel-style transition pipeline tied to avenue outcomes
-[ ] Environment/sprite state persistence across turns
-[ ] Ending grading and cutscene states
+[x] SceneRenderConfig and visual delta support in backend session updates
+[x] Layered stage rendering components in React
+[x] Pixel-style transition pipeline tied to avenue outcomes
+[x] Environment/sprite state persistence across turns
+[x] Ending grading and grading panel states
+[x] Config-driven provider switch across external + local (`openrouter`, `lmstudio`)
+[ ] Docker build verification blocked in current sandbox (daemon unavailable)
+[ ] Native MLX adapter (future)
+[ ] Native WebGPU adapter (future)
 
 Acceptance target:
 Player actions trigger visible world-state changes in an 8-bit presentation, synchronized with deterministic backend updates.
