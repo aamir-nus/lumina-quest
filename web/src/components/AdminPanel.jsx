@@ -124,6 +124,7 @@ export function AdminPanel({ me, onPlaytestSession }) {
 
       <div className="subcard">
         <h3>Resolver Observability</h3>
+        <p className="muted">Provider: {observability.data?.provider || 'n/a'}</p>
         <p className="muted">
           Total: {observability.data?.metrics?.total || 0} | Wildcard: {observability.data?.metrics?.wildcard || 0} |
           Clarification: {observability.data?.metrics?.clarification || 0}

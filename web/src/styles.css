@@ -219,6 +219,118 @@ button:disabled {
   stroke-width: 1.2;
 }
 
+.gameStage {
+  margin-top: 8px;
+  border: 2px solid #9b6f62;
+  border-radius: 8px;
+  padding: 8px;
+  image-rendering: pixelated;
+}
+
+.stageLayers {
+  min-height: 130px;
+  border: 2px dashed rgba(31, 47, 56, 0.3);
+  padding: 8px;
+  display: grid;
+  gap: 4px;
+}
+
+.layerTile {
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  border: 1px solid rgba(31, 47, 56, 0.4);
+  padding: 3px 6px;
+}
+
+.layerTile.off {
+  opacity: 0.35;
+}
+
+.layerTile.bg {
+  background: rgba(132, 193, 172, 0.22);
+}
+
+.layerTile.fg {
+  background: rgba(209, 128, 82, 0.24);
+}
+
+.sprite {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  border: 2px solid rgba(31, 47, 56, 0.55);
+  background: #fff6e6;
+  font-family: 'Courier New', monospace;
+  padding: 4px 8px;
+}
+
+.sprite[data-mood='heroic'] {
+  border-color: #3f8f7b;
+}
+
+.sprite[data-mood='greedy'] {
+  border-color: #bf5630;
+}
+
+.sprite[data-mood='focused'] {
+  border-color: #456da8;
+}
+
+.theme-pastel {
+  background: linear-gradient(180deg, #f6eee6, #f4f6ee);
+}
+
+.theme-night {
+  background: linear-gradient(180deg, #2f3e63, #4b6f88);
+  color: #ecf2ff;
+}
+
+.theme-sunrise {
+  background: linear-gradient(180deg, #fdd9b9, #fbeec5);
+}
+
+.theme-victory {
+  background: linear-gradient(180deg, #d6f5d8, #f4ffd9);
+}
+
+.theme-crimson {
+  background: linear-gradient(180deg, #7f2b35, #b23e4e);
+  color: #fff2f0;
+}
+
+.transitionOverlay {
+  margin-top: 8px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.transitionOverlay.fade {
+  background: rgba(31, 47, 56, 0.12);
+}
+
+.transitionOverlay.scanline {
+  background: repeating-linear-gradient(180deg, rgba(69, 109, 168, 0.22), rgba(69, 109, 168, 0.22) 3px, transparent 3px, transparent 6px);
+}
+
+.transitionOverlay.arcade-flash {
+  background: linear-gradient(90deg, rgba(63, 143, 123, 0.32), rgba(255, 245, 161, 0.46));
+}
+
+.transitionOverlay.glitch {
+  background: linear-gradient(90deg, rgba(178, 62, 78, 0.36), rgba(77, 132, 176, 0.28));
+}
+
+.endingPanel {
+  margin-top: 10px;
+  border: 2px solid rgba(31, 47, 56, 0.44);
+  border-radius: 10px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.62);
+}
+
 .animatedScene {
   animation: fadeSlide 280ms ease;
 }

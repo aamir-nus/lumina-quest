@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
+import { EndingPanel } from './EndingPanel';
+import { GameStage } from './GameStage';
+import { SceneTransitionOverlay } from './SceneTransitionOverlay';
 
 export function PlayerPanel({ me, externalSessionId }) {
   const [sessionId, setSessionId] = useState('');
@@ -54,6 +57,7 @@ export function PlayerPanel({ me, externalSessionId }) {
   const game = sessionQuery.data?.game;
   const turnsRemaining = game ? Math.max(0, game.constraints.maxTurns - (session?.stats?.turnsUsed || 0)) : 0;
   const pointsToTarget = game ? Math.max(0, game.constraints.targetPoints - (session?.stats?.points || 0)) : 0;
+  const transition = session?.visualState?.transition || lastResolution?.type || '';
 
   return (
     <section className="card">
@@ -88,6 +92,8 @@ export function PlayerPanel({ me, externalSessionId }) {
           <div className="scene animatedScene">
             <h3>{scene?.sceneId}</h3>
             <p>{scene?.narrative}</p>
+            <GameStage scene={scene} visualState={session.visualState} />
+            <SceneTransitionOverlay transition={transition} />
           </div>
 
           {lastResolution ? (
@@ -129,6 +135,7 @@ export function PlayerPanel({ me, externalSessionId }) {
               </div>
             ))}
           </div>
+          <EndingPanel session={session} game={game} />
         </>
       ) : null}
     </section>
