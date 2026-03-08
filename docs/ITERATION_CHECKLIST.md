@@ -9,9 +9,9 @@
 - [x] Implement async OpenRouter LLM resolver with mock fallback
 - [x] Implement minimal Admin Forge UI
 - [x] Implement minimal Player Journey UI
-- [ ] Add smoke-test/run verification and known limits
-- [ ] Update README with mermaid architecture + iteration status
-- [ ] Summarize Iteration 1 learnings/context for Iteration 2
+- [x] Add smoke-test/run verification and known limits
+- [x] Update README with mermaid architecture + iteration status
+- [x] Summarize Iteration 1 learnings/context for Iteration 2
 
 ## Iteration 2 - Narrative Intelligence & Observability
 - [ ] Add bounded wildcard policy service (server-authoritative)
