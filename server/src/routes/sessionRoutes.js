@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import { z } from 'zod';
 import { requireAuth } from '../middleware/auth.js';
 import { GameTemplate } from '../models/GameTemplate.js';
@@ -24,6 +25,10 @@ router.post('/start', async (req, res) => {
     return res.status(400).json({ error: 'Invalid payload' });
   }
 
+  if (!mongoose.isValidObjectId(parsed.data.gameId)) {
+    return res.status(400).json({ error: 'Invalid gameId' });
+  }
+
   const game = await GameTemplate.findOne({ _id: parsed.data.gameId, status: 'public' });
   if (!game) {
     return res.status(404).json({ error: 'Game not found or not public' });
@@ -41,6 +46,10 @@ router.post('/start', async (req, res) => {
 });
 
 router.get('/:sessionId', async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.sessionId)) {
+    return res.status(400).json({ error: 'Invalid sessionId' });
+  }
+
   const session = await PlayerSession.findOne({ _id: req.params.sessionId, userId: req.user.id }).lean();
   if (!session) {
     return res.status(404).json({ error: 'Session not found' });
@@ -58,6 +67,10 @@ router.post('/action', async (req, res) => {
     return res.status(400).json({ error: 'Invalid payload' });
   }
 
+  if (!mongoose.isValidObjectId(parsed.data.sessionId)) {
+    return res.status(400).json({ error: 'Invalid sessionId' });
+  }
+
   const session = await PlayerSession.findOne({ _id: parsed.data.sessionId, userId: req.user.id });
   if (!session) {
     return res.status(404).json({ error: 'Session not found' });
@@ -68,6 +81,9 @@ router.post('/action', async (req, res) => {
   }
 
   const game = await GameTemplate.findById(session.gameId);
+  if (!game) {
+    return res.status(404).json({ error: 'Game for session no longer exists' });
+  }
   const currentScene = game.scenes.find((scene) => scene.sceneId === session.currentSceneId);
 
   if (!currentScene || currentScene.isTerminal || currentScene.avenues.length === 0) {

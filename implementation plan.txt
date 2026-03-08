@@ -1,6 +1,6 @@
 LuminaQuest - Clean 3-Iteration Plan
 
-Iteration 1 - Playable Story Engine MVP (Current)
+Iteration 1 - Playable Story Engine MVP (Stable)
 Objective:
 Deliver an end-to-end vertical slice where admins can publish authored stories and players can complete sessions through LLM-mapped actions.
 
@@ -13,8 +13,11 @@ Scope checklist:
 [x] Async LLM resolver using OpenRouter with free-model support (`openrouter/free` or `:free`)
 [x] Mock OpenAI Responses-style fallback when provider key/call is unavailable
 [x] Minimal Admin Forge UI and Player Journey UI
-[ ] Add smoke-test verification notes and known constraints
-[ ] Finalize README iteration status and entrypoints
+[x] Add smoke-test verification notes and known constraints
+[x] Finalize README iteration status and entrypoints
+[x] Stability pass: Mongo retry + diagnostics + docker compose bootstrap
+[x] Stability pass: safer route validation for ObjectId inputs
+[x] Confirm persistence boundary: backend-only DB operations
 
 Acceptance target:
 An admin creates and publishes a 3-scene game, and a user plays from start to terminal with points/turn tracking and persisted history.

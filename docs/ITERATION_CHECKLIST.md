@@ -10,6 +10,10 @@
 - [x] Implement minimal Admin Forge UI
 - [x] Implement minimal Player Journey UI
 - [x] Add smoke-test/run verification and known limits
+- [x] Stabilize Mongo startup (retry strategy + diagnostics)
+- [x] Add local Mongo runtime workflow (`docker compose` helper scripts)
+- [x] Harden API ID validation (`gameId`/`sessionId`) for safer error handling
+- [x] Confirm DB operations remain backend-only (frontend uses API layer only)
 - [x] Update README with mermaid architecture + iteration status
 - [x] Summarize Iteration 1 learnings/context for Iteration 2
 
