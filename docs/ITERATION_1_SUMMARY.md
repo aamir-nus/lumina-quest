@@ -11,12 +11,15 @@
 ## Verification Notes
 - `npm run build -w web` passes.
 - Server runtime requires reachable MongoDB (`MONGO_URI`, default `mongodb://127.0.0.1:27017/luminaquest`).
-- In this environment, server boot failed due to Mongo connectivity (`EPERM 127.0.0.1:27017`).
+- Stability pass added Mongo connection retries + clearer startup diagnostics.
+- Local Mongo bootstrap is now standardized via `npm run mongo:up` (Docker compose).
+- Health endpoint now reports DB readiness (`/health`).
 
 ## Learnings
 - Clear authored avenue IDs plus strict JSON mapping keeps turn resolution deterministic.
 - Async provider abstraction allows future streaming and fallback policy upgrades without route changes.
 - Starter game seeding in UI accelerates manual acceptance testing for Admin + Player flows.
+- Keeping database access strictly backend-only simplifies security and deployment boundaries.
 
 ## Context for Iteration 2
 - Add bounded wildcard policy only as a server-approved bridge (never model-authored scene creation).

@@ -19,7 +19,7 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-  I1["Iteration 1: Playable Story Engine MVP"] --> S1["In Progress"]
+  I1["Iteration 1: Playable Story Engine MVP"] --> S1["Stable"]
   I2["Iteration 2: Narrative Intelligence + Observability"] --> S2["Planned"]
   I3["Iteration 3: 8-Bit Visual Presentation"] --> S3["Planned"]
 ```
@@ -28,6 +28,7 @@ flowchart TD
   - Express + Mongo core APIs (auth, game CRUD/publish, session action engine)
   - Async OpenRouter resolver adapter with OpenAI Responses-style mock fallback
   - Minimal React UI for admin publish flow and player gameplay loop
+  - Stability pass: Mongo connect retry + diagnostics, Docker Mongo workflow, ObjectId input hardening
 - Iteration checklist: [`docs/ITERATION_CHECKLIST.md`](/Users/aamirsyedaltaf/Documents/lumina-quest/docs/ITERATION_CHECKLIST.md)
 
 ## Entrypoints
@@ -39,11 +40,20 @@ flowchart LR
   C --> B
 ```
 
+Data access rule:
+- Web app does not connect to MongoDB directly. All persistence operations are server-side via `server/src/*` routes/services/models.
+
 Setup:
 1. Install dependencies: `npm install`
 2. Configure env: copy `.env.example` to `.env`
-3. Run API: `npm run dev:server`
-4. Run web app: `npm run dev:web`
+3. Start MongoDB: `npm run mongo:up`
+4. Run API: `npm run dev:server`
+5. Run web app: `npm run dev:web`
+6. (Optional) Inspect DB container: `npm run mongo:logs`
+
+Mongo reliability notes:
+- Server retries Mongo connection using `MONGO_CONNECT_RETRIES` and `MONGO_CONNECT_RETRY_DELAY_MS`.
+- Health endpoint includes db status: `GET /health` -> `db.state` / `db.readyState`.
 
 ## OpenRouter Notes
 
