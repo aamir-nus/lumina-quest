@@ -18,12 +18,16 @@
 - [x] Summarize Iteration 1 learnings/context for Iteration 2
 
 ## Iteration 2 - Narrative Intelligence & Observability
-- [ ] Add bounded wildcard policy service (server-authoritative)
-- [ ] Add provider fallback tracking and metrics surface
-- [ ] Add Langfuse/OpenTelemetry trace hooks for resolver pipeline
-- [ ] Add admin graph visualization + playtest from arbitrary scene
-- [ ] Add player-side route explanation and replay panel
-- [ ] Update README with iteration status and flow diagram
+- [x] Add bounded wildcard policy service (server-authoritative)
+- [x] Add provider fallback tracking and metrics surface
+- [x] Add Langfuse/OpenTelemetry-style trace hooks for resolver pipeline
+- [x] Add admin graph visualization + playtest from arbitrary scene
+- [x] Add player-side route explanation and replay panel
+- [x] Add two-stage route pipeline (classify -> policy validate -> narrate)
+- [x] Add graph analysis endpoint and UI output
+- [x] Complete hardening gate from multi-agent review report
+- [x] Update README with iteration status and flow diagram
+- [x] Summarize Iteration 2 learnings/context for Iteration 3
 
 ## Iteration 3 - 8-bit Presentation Layer
 - [ ] Add scene render config and visual state deltas in backend

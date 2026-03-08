@@ -48,6 +48,12 @@ export function validatePublishability(game) {
     errors.push(`Invalid avenue nextSceneId references: ${invalidEdges.join(', ')}`);
   }
 
+  if (game.wildcardConfig?.enabled && game.wildcardConfig?.recoverySceneId) {
+    if (!byId[game.wildcardConfig.recoverySceneId]) {
+      errors.push('wildcardConfig.recoverySceneId must reference an existing scene');
+    }
+  }
+
   return {
     ok: errors.length === 0,
     errors

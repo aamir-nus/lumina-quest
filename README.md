@@ -6,13 +6,13 @@ Turn-based MERN story engine where authored branches stay deterministic and LLMs
 
 ```mermaid
 flowchart LR
-  A["Admin Forge"] --> B["Game Template (Scenes + Avenues)"]
-  B --> C["Publish Validation"]
-  C --> D["Public Game Library"]
-  D --> E["Player Session"]
-  E --> F["LLM Intent Resolver"]
-  F --> G["Server-Validated Avenue"]
-  G --> H["Session State Update (Points/Turns/History)"]
+  A["Admin Forge"] --> B["Scene Graph (Authored)"]
+  B --> C["Publish + Analysis"]
+  C --> D["Public + Draft Playtest Sessions"]
+  D --> E["Player Action"]
+  E --> F["Stage 1: Intent Classification"]
+  F --> G["Stage 2: Policy Validation (Avenue/Wildcard/Clarification)"]
+  G --> H["Stage 3: Narration + Persist + Explain"]
 ```
 
 ## Iteration Status
@@ -20,49 +20,49 @@ flowchart LR
 ```mermaid
 flowchart TD
   I1["Iteration 1: Playable Story Engine MVP"] --> S1["Stable"]
-  I2["Iteration 2: Narrative Intelligence + Observability"] --> S2["Planned"]
-  I3["Iteration 3: 8-Bit Visual Presentation"] --> S3["Planned"]
+  I2["Iteration 2: Narrative Intelligence + Observability"] --> S2["Stable + Hardened"]
+  I3["Iteration 3: 8-Bit Visual Presentation"] --> S3["Blocked Until Hardening Complete"]
 ```
 
-- Iteration 1 delivered now:
-  - Express + Mongo core APIs (auth, game CRUD/publish, session action engine)
-  - Async OpenRouter resolver adapter with OpenAI Responses-style mock fallback
-  - Minimal React UI for admin publish flow and player gameplay loop
-  - Stability pass: Mongo connect retry + diagnostics, Docker Mongo workflow, ObjectId input hardening
-- Iteration checklist: [`docs/ITERATION_CHECKLIST.md`](/Users/aamirsyedaltaf/Documents/lumina-quest/docs/ITERATION_CHECKLIST.md)
+## Hardening Gate
+
+Iteration 3 should not begin until hardening checks are complete. Current status is complete:
+- [Hardening Checklist](/Users/aamirsyedaltaf/Documents/lumina-quest/docs/ITERATION_2_HARDENING.md)
 
 ## Entrypoints
 
 ```mermaid
 flowchart LR
-  A["MongoDB (local)"] --> B["Server :4000"]
-  B --> C["Web :5173"]
+  A["MongoDB"] --> B["Express API :4000"]
+  B --> C["React App :5173"]
   C --> B
 ```
-
-Data access rule:
-- Web app does not connect to MongoDB directly. All persistence operations are server-side via `server/src/*` routes/services/models.
 
 Setup:
 1. Install dependencies: `npm install`
 2. Configure env: copy `.env.example` to `.env`
-3. Start MongoDB: `npm run mongo:up`
-4. Run API: `npm run dev:server`
-5. Run web app: `npm run dev:web`
-6. (Optional) Inspect DB container: `npm run mongo:logs`
+3. Set `JWT_SECRET` to a strong 24+ char secret
+4. Start MongoDB: `npm run mongo:up`
+5. Run API: `npm run dev:server`
+6. Run web app: `npm run dev:web`
 
-Mongo reliability notes:
-- Server retries Mongo connection using `MONGO_CONNECT_RETRIES` and `MONGO_CONNECT_RETRY_DELAY_MS`.
-- Health endpoint includes db status: `GET /health` -> `db.state` / `db.readyState`.
+## Security & Reliability Defaults
 
-## OpenRouter Notes
+- Helmet security headers enabled
+- Rate limiting enabled (`/api` and stricter `/api/auth`)
+- Request payload sanitization and JSON body size limit enabled
+- Standardized structured API errors
+- Route async failures captured centrally
+- Frontend error boundary + safe localStorage wrappers
 
-The server uses OpenRouter via OpenAI-compatible SDK configuration:
-- Base URL: `https://openrouter.ai/api/v1`
-- Headers: `HTTP-Referer`, `X-Title`
-- Model strategy: use free routes (`openrouter/free`) or explicit `:free` model slugs.
+## API Base Paths
 
-References:
-- [OpenRouter API Overview](https://openrouter.ai/docs/api-reference/overview)
-- [OpenRouter Quickstart](https://openrouter.ai/docs/quickstart)
-- [OpenRouter Models (free examples)](https://openrouter.ai/models?q=free)
+- `/api`
+- `/api/v1`
+
+See API quick reference:
+- [API Overview](/Users/aamirsyedaltaf/Documents/lumina-quest/docs/API.md)
+
+## Data Access Rule
+
+Frontend never connects directly to MongoDB. All persistence is backend-only.
