@@ -1,0 +1,53 @@
+LuminaQuest - Clean 3-Iteration Plan
+
+Iteration 1 - Playable Story Engine MVP (Current)
+Objective:
+Deliver an end-to-end vertical slice where admins can publish authored stories and players can complete sessions through LLM-mapped actions.
+
+Scope checklist:
+[x] Monorepo workspace setup (`server`, `web`)
+[x] Dependency installation and runnable scripts
+[x] Express + Mongo models + JWT auth (`admin`, `user`)
+[x] Admin game CRUD + publish validation
+[x] Player session engine (start, action resolve, status transitions)
+[x] Async LLM resolver using OpenRouter with free-model support (`openrouter/free` or `:free`)
+[x] Mock OpenAI Responses-style fallback when provider key/call is unavailable
+[x] Minimal Admin Forge UI and Player Journey UI
+[ ] Add smoke-test verification notes and known constraints
+[ ] Finalize README iteration status and entrypoints
+
+Acceptance target:
+An admin creates and publishes a 3-scene game, and a user plays from start to terminal with points/turn tracking and persisted history.
+
+------------------------------------------------------------
+
+Iteration 2 - Narrative Intelligence + Observability
+Objective:
+Improve narrative quality and trust while keeping server-deterministic outcomes.
+
+Scope checklist:
+[ ] Wildcard policy service (bounded dynamic bridge rules)
+[ ] Two-stage resolution pipeline (intent map + narration layer)
+[ ] Provider fallback metrics and quality counters
+[ ] Langfuse/OpenTelemetry tracing around LLM calls
+[ ] Admin graph visualization + draft playtest mode
+[ ] Player replay timeline + route explanation panel
+
+Acceptance target:
+Creative inputs can route through server-approved wildcard bridges without introducing invalid scenes or rewards.
+
+------------------------------------------------------------
+
+Iteration 3 - 8-Bit Visual Presentation Layer
+Objective:
+Transition from basic chat card gameplay to layered 8-bit story staging while preserving backend authority.
+
+Scope checklist:
+[ ] SceneRenderConfig and visual delta support in backend session updates
+[ ] Layered stage rendering components in React
+[ ] Pixel-style transition pipeline tied to avenue outcomes
+[ ] Environment/sprite state persistence across turns
+[ ] Ending grading and cutscene states
+
+Acceptance target:
+Player actions trigger visible world-state changes in an 8-bit presentation, synchronized with deterministic backend updates.
