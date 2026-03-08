@@ -25,6 +25,7 @@
 - [x] Add player-side route explanation and replay panel
 - [x] Add two-stage route pipeline (classify -> policy validate -> narrate)
 - [x] Add graph analysis endpoint and UI output
+- [x] Complete hardening gate from multi-agent review report
 - [x] Update README with iteration status and flow diagram
 - [x] Summarize Iteration 2 learnings/context for Iteration 3
 

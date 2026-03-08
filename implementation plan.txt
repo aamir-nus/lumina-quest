@@ -24,7 +24,7 @@ An admin creates and publishes a 3-scene game, and a user plays from start to te
 
 ------------------------------------------------------------
 
-Iteration 2 - Narrative Intelligence + Observability (Stable)
+Iteration 2 - Narrative Intelligence + Observability (Stable + Hardened)
 Objective:
 Improve narrative quality and trust while keeping server-deterministic outcomes.
 
@@ -36,7 +36,11 @@ Scope checklist:
 [x] Admin graph visualization and graph analysis
 [x] Draft playtest mode from arbitrary scene
 [x] Player replay timeline and route explanation surfaces
-[x] README/status/handover updates
+[x] Security hardening (helmet, rate limits, input sanitization)
+[x] Error handling hardening (async wrappers, standardized API errors, service logging)
+[x] Frontend reliability hardening (error boundary, safe storage, side-effect cleanup)
+[x] Maintainability hardening (split components, refactor session handler, indexes)
+[x] Production baseline (tests, CI workflow, Dockerfiles, API docs, /api/v1 alias)
 
 Acceptance target:
 Creative inputs can route through server-approved wildcard bridges without introducing invalid scenes or rewards.
