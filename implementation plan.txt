@@ -24,17 +24,19 @@ An admin creates and publishes a 3-scene game, and a user plays from start to te
 
 ------------------------------------------------------------
 
-Iteration 2 - Narrative Intelligence + Observability
+Iteration 2 - Narrative Intelligence + Observability (Stable)
 Objective:
 Improve narrative quality and trust while keeping server-deterministic outcomes.
 
 Scope checklist:
-[ ] Wildcard policy service (bounded dynamic bridge rules)
-[ ] Two-stage resolution pipeline (intent map + narration layer)
-[ ] Provider fallback metrics and quality counters
-[ ] Langfuse/OpenTelemetry tracing around LLM calls
-[ ] Admin graph visualization + draft playtest mode
-[ ] Player replay timeline + route explanation panel
+[x] Wildcard policy service (bounded dynamic bridge rules)
+[x] Two-stage resolution pipeline (intent map + narration layer)
+[x] Provider fallback metrics and quality counters
+[x] Trace hooks for resolver pipeline with optional Langfuse sink
+[x] Admin graph visualization and graph analysis
+[x] Draft playtest mode from arbitrary scene
+[x] Player replay timeline and route explanation surfaces
+[x] README/status/handover updates
 
 Acceptance target:
 Creative inputs can route through server-approved wildcard bridges without introducing invalid scenes or rewards.
