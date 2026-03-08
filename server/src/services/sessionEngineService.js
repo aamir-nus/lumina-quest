@@ -5,15 +5,43 @@ import { classifyRoute, generateNarration } from './llmResolver.js';
 import { evaluateWildcard } from './wildcardPolicyService.js';
 import { addSpan, endTrace, startTrace } from './traceService.js';
 
+function baseVisualStateFromScene(scene) {
+  const render = scene?.renderConfig || {};
+  return {
+    theme: render.theme || 'pastel',
+    activeLayers: [...(render.backgroundLayers || []), ...(render.foregroundLayers || [])],
+    spriteMood: render.sprite?.mood || 'neutral',
+    transition: 'fade'
+  };
+}
+
+function applyVisualEffects(baseState, avenue) {
+  const effects = avenue?.visualEffects || {};
+  const layers = new Set(baseState.activeLayers || []);
+
+  for (const layer of effects.enableLayers || []) layers.add(layer);
+  for (const layer of effects.disableLayers || []) layers.delete(layer);
+
+  return {
+    ...baseState,
+    theme: effects.setTheme || baseState.theme,
+    spriteMood: effects.spriteMood || baseState.spriteMood,
+    transition: effects.transition || 'fade',
+    activeLayers: [...layers]
+  };
+}
+
 export async function startSessionForUser({ userId, gameId }) {
   const game = await GameTemplate.findOne({ _id: gameId, status: 'public' });
   if (!game) throw new ApiError(404, 'GAME_NOT_FOUND', 'Game not found or not public');
+  const startScene = game.scenes.find((scene) => scene.sceneId === game.startSceneId);
 
   const session = await PlayerSession.create({
     userId,
     gameId: game._id,
     currentSceneId: game.startSceneId,
     stats: { points: 0, turnsUsed: 0 },
+    visualState: baseVisualStateFromScene(startScene),
     history: []
   });
 
@@ -66,6 +94,7 @@ async function resolveClarification({ session, game, currentScene, payload, clas
     narration: narration.text,
     pointsDelta: 0
   });
+  session.visualState.transition = 'pulse';
 
   await session.save();
   addSpan(traceId, 'clarification', { maxTurnsReached });
@@ -180,6 +209,11 @@ export async function processSessionAction({ userId, payload }) {
   session.currentSceneId = destinationSceneId;
 
   const nextScene = game.scenes.find((scene) => scene.sceneId === destinationSceneId);
+  const nextVisualBase = baseVisualStateFromScene(nextScene || currentScene);
+  session.visualState = applyVisualEffects(nextVisualBase, selectedAvenue);
+  if (resolutionType === 'wildcard') {
+    session.visualState.transition = wildcardMode === 'high-reward' ? 'arcade-flash' : 'scanline';
+  }
   if (nextScene?.isTerminal || session.stats.turnsUsed >= game.constraints.maxTurns) {
     session.status = session.stats.points >= game.constraints.targetPoints ? 'won' : 'lost';
   }

@@ -14,7 +14,22 @@ const avenueSchema = z.object({
   label: z.string().min(1),
   keywords: z.array(z.string()).default([]),
   points: z.number(),
-  nextSceneId: z.string().min(1)
+  nextSceneId: z.string().min(1),
+  visualEffects: z
+    .object({
+      transition: z.string().default('fade'),
+      spriteMood: z.string().default(''),
+      setTheme: z.string().default(''),
+      enableLayers: z.array(z.string()).default([]),
+      disableLayers: z.array(z.string()).default([])
+    })
+    .default({
+      transition: 'fade',
+      spriteMood: '',
+      setTheme: '',
+      enableLayers: [],
+      disableLayers: []
+    })
 });
 
 const sceneSchema = z.object({
@@ -22,6 +37,26 @@ const sceneSchema = z.object({
   narrative: z.string().min(1),
   imageKey: z.string().default(''),
   isTerminal: z.boolean().default(false),
+  renderConfig: z
+    .object({
+      theme: z.string().default('pastel'),
+      backgroundLayers: z.array(z.string()).default([]),
+      foregroundLayers: z.array(z.string()).default([]),
+      sprite: z
+        .object({
+          id: z.string().default('hero'),
+          mood: z.string().default('neutral'),
+          x: z.number().default(0.5),
+          y: z.number().default(0.82)
+        })
+        .default({ id: 'hero', mood: 'neutral', x: 0.5, y: 0.82 })
+    })
+    .default({
+      theme: 'pastel',
+      backgroundLayers: [],
+      foregroundLayers: [],
+      sprite: { id: 'hero', mood: 'neutral', x: 0.5, y: 0.82 }
+    }),
   avenues: z.array(avenueSchema)
 });
 

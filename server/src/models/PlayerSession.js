@@ -27,6 +27,12 @@ const playerSessionSchema = new mongoose.Schema(
       points: { type: Number, default: 0 },
       turnsUsed: { type: Number, default: 0 }
     },
+    visualState: {
+      theme: { type: String, default: 'pastel' },
+      activeLayers: { type: [String], default: [] },
+      spriteMood: { type: String, default: 'neutral' },
+      transition: { type: String, default: 'fade' }
+    },
     history: { type: [historyItemSchema], default: [] }
   },
   { timestamps: true }

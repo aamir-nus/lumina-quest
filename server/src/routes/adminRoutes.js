@@ -8,6 +8,7 @@ import { getResolverMetrics } from '../services/resolverMetricsService.js';
 import { getRecentTraces } from '../services/traceService.js';
 import { ApiError } from '../errors/ApiError.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
+import { env } from '../config/env.js';
 
 const router = express.Router();
 
@@ -40,6 +41,8 @@ router.post('/games/:gameId/playtest', asyncHandler(async (req, res) => {
   const requestedScene = String(req.body?.startSceneId || '').trim();
   const availableSceneIds = new Set(game.scenes.map((scene) => scene.sceneId));
   const startSceneId = availableSceneIds.has(requestedScene) ? requestedScene : game.startSceneId;
+  const startScene = game.scenes.find((scene) => scene.sceneId === startSceneId);
+  const startRender = startScene?.renderConfig || {};
 
   const session = await PlayerSession.create({
     userId: req.user.id,
@@ -51,6 +54,12 @@ router.post('/games/:gameId/playtest', asyncHandler(async (req, res) => {
       startSceneOverride: startSceneId
     },
     stats: { points: 0, turnsUsed: 0 },
+    visualState: {
+      theme: startRender.theme || 'pastel',
+      activeLayers: [...(startRender.backgroundLayers || []), ...(startRender.foregroundLayers || [])],
+      spriteMood: startRender.sprite?.mood || 'neutral',
+      transition: 'fade'
+    },
     history: []
   });
 
@@ -59,6 +68,8 @@ router.post('/games/:gameId/playtest', asyncHandler(async (req, res) => {
 
 router.get('/observability/resolver', asyncHandler(async (_req, res) => {
   return res.json({
+    provider: env.llmProvider,
+    providerOptions: ['openrouter', 'lmstudio'],
     metrics: getResolverMetrics(),
     traces: getRecentTraces(15)
   });

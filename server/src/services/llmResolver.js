@@ -8,21 +8,50 @@ import {
   recordRouteType
 } from './resolverMetricsService.js';
 
-const client = new OpenAI({
-  apiKey: env.openRouterApiKey || 'missing-key',
-  baseURL: 'https://openrouter.ai/api/v1',
-  defaultHeaders: {
-    'HTTP-Referer': env.openRouterSiteUrl,
-    'X-Title': env.openRouterSiteName
+function getProviderConfig() {
+  if (env.llmProvider === 'lmstudio') {
+    return {
+      provider: 'lmstudio',
+      apiKey: env.lmStudioApiKey || 'lm-studio',
+      baseURL: env.lmStudioBaseUrl,
+      model: env.lmStudioModel,
+      hasApiKey: true,
+      headers: {}
+    };
   }
-});
+
+  return {
+    provider: 'openrouter',
+    apiKey: env.openRouterApiKey || 'missing-key',
+    baseURL: 'https://openrouter.ai/api/v1',
+    model: env.openRouterModel,
+    hasApiKey: Boolean(env.openRouterApiKey),
+    headers: {
+      'HTTP-Referer': env.openRouterSiteUrl,
+      'X-Title': env.openRouterSiteName
+    }
+  };
+}
+
+function createClient() {
+  const provider = getProviderConfig();
+  return {
+    provider,
+    client: new OpenAI({
+      apiKey: provider.apiKey,
+      baseURL: provider.baseURL,
+      defaultHeaders: provider.headers
+    })
+  };
+}
 
 function mockResponse(payload) {
+  const { provider } = createClient();
   return {
     id: `resp_mock_${Date.now()}`,
     object: 'response',
     status: 'completed',
-    model: env.openRouterModel,
+    model: provider.model,
     output: [
       {
         id: `msg_mock_${Date.now()}`,
@@ -91,14 +120,16 @@ function heuristicClassify({ input, avenues }) {
 }
 
 export async function classifyRoute({ gameTitle, sceneNarrative, input, avenues, history, wildcardEnabled }) {
+  const { provider, client } = createClient();
   const fallbackAvenue = avenues[0]?.avenueId || null;
   const heuristic = heuristicClassify({ input, avenues });
 
-  if (!env.openRouterApiKey) {
+  if (!provider.hasApiKey) {
     recordMockResponse();
     recordRouteType(heuristic.routeType);
     return {
       ...heuristic,
+      provider: provider.provider,
       providerResponse: mockResponse({ ...heuristic, reason: 'mock_no_api_key' })
     };
   }
@@ -117,7 +148,7 @@ export async function classifyRoute({ gameTitle, sceneNarrative, input, avenues,
 
   try {
     const response = await client.responses.create({
-      model: env.openRouterModel,
+      model: provider.model,
       input: [
         {
           role: 'system',
@@ -152,6 +183,7 @@ export async function classifyRoute({ gameTitle, sceneNarrative, input, avenues,
       confidence: Number(parsed.confidence || heuristic.confidence || 0.5),
       explanation: parsed.explanation || 'Mapped by classifier.',
       wildcard: parsed.wildcard || null,
+      provider: provider.provider,
       providerResponse: response
     };
   } catch (error) {
@@ -162,6 +194,7 @@ export async function classifyRoute({ gameTitle, sceneNarrative, input, avenues,
     return {
       ...heuristic,
       avenueId: heuristic.avenueId || fallbackAvenue,
+      provider: provider.provider,
       providerResponse: mockResponse({ ...heuristic, reason: 'mock_provider_error' })
     };
   }
@@ -175,12 +208,14 @@ export async function generateNarration({
   routeLabel,
   tone = 'cinematic'
 }) {
+  const { provider, client } = createClient();
   const fallbackText = `Action resolved as ${resolutionType}${routeLabel ? ` (${routeLabel})` : ''}.`;
 
-  if (!env.openRouterApiKey) {
+  if (!provider.hasApiKey) {
     recordMockResponse();
     return {
       text: `${fallbackText} ${sceneNarrative}`,
+      provider: provider.provider,
       providerResponse: mockResponse({ narration: fallbackText, reason: 'mock_no_api_key' })
     };
   }
@@ -197,7 +232,7 @@ export async function generateNarration({
 
   try {
     const response = await client.responses.create({
-      model: env.openRouterModel,
+      model: provider.model,
       input: [
         {
           role: 'system',
@@ -211,13 +246,14 @@ export async function generateNarration({
     });
 
     const parsed = parseOutput(response, { text: fallbackText });
-    return { text: parsed.text || fallbackText, providerResponse: response };
+    return { text: parsed.text || fallbackText, provider: provider.provider, providerResponse: response };
   } catch (error) {
     logger.error('Narration provider call failed', { message: error.message });
     recordProviderError();
     recordMockResponse();
     return {
       text: `${fallbackText} ${sceneNarrative}`,
+      provider: provider.provider,
       providerResponse: mockResponse({ narration: fallbackText, reason: 'mock_provider_error' })
     };
   }
