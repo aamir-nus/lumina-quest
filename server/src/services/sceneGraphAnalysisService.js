@@ -28,7 +28,7 @@ function calcTurnEconomy(game) {
   let maxTurns = 0;
 
   function dfs(sceneId, turns, seen) {
-    if (turns > game.constraints.maxTurns + 3) return;
+    if (turns > game.constraints.maxTurns + GAME.TURN_SEARCH_BUFFER) return;
     if (terminals.has(sceneId)) {
       minTurns = Math.min(minTurns, turns);
       maxTurns = Math.max(maxTurns, turns);
@@ -61,7 +61,7 @@ function calcPointBounds(game) {
   let maxPoints = -Infinity;
 
   function dfs(sceneId, points, seen) {
-    if (seen.size > game.constraints.maxTurns + 3) return;
+    if (seen.size > game.constraints.maxTurns + GAME.TURN_SEARCH_BUFFER) return;
     if (terminals.has(sceneId)) {
       minPoints = Math.min(minPoints, points);
       maxPoints = Math.max(maxPoints, points);
@@ -105,3 +105,4 @@ export function analyzeGameGraph(game) {
     turnEconomy: calcTurnEconomy(game)
   };
 }
+import { GAME } from '../constants/appConstants.js';

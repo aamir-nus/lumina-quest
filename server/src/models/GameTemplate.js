@@ -44,4 +44,19 @@ const gameTemplateSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+gameTemplateSchema.index({ adminId: 1, status: 1, updatedAt: -1 });
+gameTemplateSchema.index({ status: 1, createdAt: -1 });
+
+gameTemplateSchema.pre('validate', function enforceUniqueSceneIds(next) {
+  const seen = new Set();
+  for (const scene of this.scenes || []) {
+    if (seen.has(scene.sceneId)) {
+      this.invalidate('scenes', `Duplicate sceneId detected: ${scene.sceneId}`);
+      break;
+    }
+    seen.add(scene.sceneId);
+  }
+  next();
+});
+
 export const GameTemplate = mongoose.model('GameTemplate', gameTemplateSchema);
