@@ -31,6 +31,12 @@ const gameTemplateSchema = new mongoose.Schema(
       maxTurns: { type: Number, required: true, min: 1 },
       targetPoints: { type: Number, required: true, min: 0 }
     },
+    wildcardConfig: {
+      enabled: { type: Boolean, default: false },
+      recoverySceneId: { type: String, default: '' },
+      highRewardPoints: { type: Number, default: 2 },
+      lowRewardPoints: { type: Number, default: 0 }
+    },
     status: { type: String, enum: ['draft', 'public'], default: 'draft' },
     startSceneId: { type: String, required: true },
     scenes: { type: [sceneSchema], default: [] }

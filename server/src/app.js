@@ -3,6 +3,7 @@ import cors from 'cors';
 import authRoutes from './routes/authRoutes.js';
 import gameRoutes from './routes/gameRoutes.js';
 import sessionRoutes from './routes/sessionRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 import { env } from './config/env.js';
 import { getDbStatus } from './config/db.js';
 
@@ -18,6 +19,7 @@ app.get('/health', (_req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/games', gameRoutes);
 app.use('/api/sessions', sessionRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error(err);

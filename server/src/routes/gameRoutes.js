@@ -30,6 +30,14 @@ const gameSchema = z.object({
     maxTurns: z.number().min(1),
     targetPoints: z.number().min(0)
   }),
+  wildcardConfig: z
+    .object({
+      enabled: z.boolean().default(false),
+      recoverySceneId: z.string().default(''),
+      highRewardPoints: z.number().default(2),
+      lowRewardPoints: z.number().default(0)
+    })
+    .default({ enabled: false, recoverySceneId: '', highRewardPoints: 2, lowRewardPoints: 0 }),
   startSceneId: z.string().min(1),
   scenes: z.array(sceneSchema).min(1)
 });

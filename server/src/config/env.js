@@ -12,5 +12,8 @@ export const env = {
   openRouterApiKey: process.env.OPENROUTER_API_KEY || '',
   openRouterModel: process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.2-3b-instruct:free',
   openRouterSiteUrl: process.env.OPENROUTER_SITE_URL || 'http://localhost:5173',
-  openRouterSiteName: process.env.OPENROUTER_SITE_NAME || 'LuminaQuest'
+  openRouterSiteName: process.env.OPENROUTER_SITE_NAME || 'LuminaQuest',
+  langfuseHost: process.env.LANGFUSE_HOST || '',
+  langfusePublicKey: process.env.LANGFUSE_PUBLIC_KEY || '',
+  langfuseSecretKey: process.env.LANGFUSE_SECRET_KEY || ''
 };
