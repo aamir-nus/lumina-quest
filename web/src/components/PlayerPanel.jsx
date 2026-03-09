@@ -9,6 +9,9 @@ function sanitizeClientInput(value) {
   return String(value || '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 500);
 }
 
+/**
+ * @param {{ me: { id?: string, email?: string, role?: string } | null, externalSessionId?: string }} props
+ */
 export function PlayerPanel({ me, externalSessionId }) {
   const [sessionId, setSessionId] = useState('');
   const [input, setInput] = useState('');
@@ -67,8 +70,26 @@ export function PlayerPanel({ me, externalSessionId }) {
   const pointsToTarget = game ? Math.max(0, game.constraints.targetPoints - (session?.stats?.points || 0)) : 0;
   const transition = session?.visualState?.transition || lastResolution?.type || '';
 
+  if (publicGames.isLoading) {
+    return (
+      <section className="card" aria-busy="true">
+        <h2>Player Journey</h2>
+        <p className="muted">Loading available games...</p>
+      </section>
+    );
+  }
+
+  if (publicGames.error) {
+    return (
+      <section className="card">
+        <h2>Player Journey</h2>
+        <p className="error" role="alert">{publicGames.error.response?.data?.error?.message || 'Failed to load games.'}</p>
+      </section>
+    );
+  }
+
   return (
-    <section className="card">
+    <section className="card" aria-live="polite">
       <h2>Player Journey</h2>
       <p className="muted">Signed in as: {me?.email || 'guest'} ({me?.role || 'n/a'})</p>
 
@@ -79,12 +100,15 @@ export function PlayerPanel({ me, externalSessionId }) {
               <strong>{gameItem.title}</strong>
               <p className="muted">target: {gameItem.constraints.targetPoints} | turns: {gameItem.constraints.maxTurns}</p>
             </div>
-            <button onClick={() => startMutation.mutate(gameItem._id)} disabled={!me || startMutation.isPending}>
+            <button type="button" onClick={() => startMutation.mutate(gameItem._id)} disabled={!me || startMutation.isPending}>
               Start
             </button>
           </div>
         ))}
       </div>
+
+      {sessionId && sessionQuery.isLoading ? <p className="muted">Loading current session...</p> : null}
+      {sessionId && sessionQuery.error ? <p className="error">Unable to load this session snapshot.</p> : null}
 
       {session ? (
         <>
@@ -128,26 +152,36 @@ export function PlayerPanel({ me, externalSessionId }) {
           ) : null}
 
           <div className="chips">
-            {(scene?.avenues || []).map((avenue) => (
-              <button key={avenue.avenueId} onClick={() => setInput(avenue.label)} className="chipBtn">
+              {(scene?.avenues || []).map((avenue) => (
+              <button type="button" key={avenue.avenueId} onClick={() => setInput(avenue.label)} className="chipBtn">
                 {avenue.label}
               </button>
             ))}
           </div>
 
           <div className="row">
+            <label htmlFor="player-action" className="srOnly">Describe your action</label>
             <input
+              id="player-action"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Describe your action"
+              aria-label="Describe your action"
               disabled={session.status !== 'active'}
             />
-            <button onClick={() => actionMutation.mutate()} disabled={!input || actionMutation.isPending || session.status !== 'active'}>
+            <button type="button" onClick={() => actionMutation.mutate()} disabled={!input || actionMutation.isPending || session.status !== 'active'}>
               {actionMutation.isPending ? 'Resolving...' : 'Send'}
             </button>
           </div>
+          {actionMutation.error ? (
+            <p className="error" role="alert">
+              {actionMutation.error.response?.data?.error?.message || 'Action failed. Please retry.'}
+            </p>
+          ) : null}
 
           <div className="history">
+            {historyQuery.isLoading ? <p className="muted">Loading session history...</p> : null}
+            {historyQuery.error ? <p className="error">Unable to load history right now.</p> : null}
             {(historyQuery.data || []).slice().reverse().map((item) => (
               <div key={`${item.turn}-${item.sceneId}-${item.userQuery}`} className="historyItem">
                 <strong>Turn {item.turn}</strong>

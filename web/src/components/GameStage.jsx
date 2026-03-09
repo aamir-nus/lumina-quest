@@ -1,3 +1,6 @@
+/**
+ * @param {{ scene: any, visualState?: any }} props
+ */
 export function GameStage({ scene, visualState }) {
   if (!scene) return null;
 

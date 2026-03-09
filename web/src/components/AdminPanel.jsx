@@ -1,11 +1,14 @@
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
 import { GraphCanvas } from './GraphCanvas';
 import { starterGame } from '../constants/starterGame';
 import { UI } from '../constants/ui';
 
-export function AdminPanel({ me, onPlaytestSession }) {
+/**
+ * @param {{ me: { id?: string, email?: string, role?: string } | null, onPlaytestSession: (sessionId: string) => void }} props
+ */
+export const AdminPanel = memo(function AdminPanel({ me, onPlaytestSession }) {
   const queryClient = useQueryClient();
   const [selectedGameId, setSelectedGameId] = useState('');
   const [startSceneOverride, setStartSceneOverride] = useState('');
@@ -62,10 +65,30 @@ export function AdminPanel({ me, onPlaytestSession }) {
     );
   }
 
+  if (myGames.isLoading) {
+    return (
+      <section className="card" aria-busy="true">
+        <h2>Admin Forge</h2>
+        <p className="muted">Loading authored games...</p>
+      </section>
+    );
+  }
+
+  if (myGames.error) {
+    return (
+      <section className="card">
+        <h2>Admin Forge</h2>
+        <p className="error" role="alert">
+          {myGames.error.response?.data?.error?.message || 'Failed to load admin games.'}
+        </p>
+      </section>
+    );
+  }
+
   return (
-    <section className="card">
+    <section className="card" aria-live="polite">
       <h2>Admin Forge</h2>
-      <button onClick={() => createMutation.mutate()} disabled={createMutation.isPending}>
+      <button type="button" onClick={() => createMutation.mutate()} disabled={createMutation.isPending}>
         {createMutation.isPending ? 'Creating...' : 'Create starter game'}
       </button>
 
@@ -77,8 +100,8 @@ export function AdminPanel({ me, onPlaytestSession }) {
               <p className="muted">{game.status} | scenes: {game.scenes.length}</p>
             </div>
             <div className="row">
-              <button onClick={() => setSelectedGameId(game._id)} className={selectedGameId === game._id ? 'active' : ''}>Graph</button>
-              <button onClick={() => publishMutation.mutate(game._id)} disabled={publishMutation.isPending || game.status === 'public'}>
+              <button type="button" onClick={() => setSelectedGameId(game._id)} className={selectedGameId === game._id ? 'active' : ''}>Graph</button>
+              <button type="button" onClick={() => publishMutation.mutate(game._id)} disabled={publishMutation.isPending || game.status === 'public'}>
                 {game.status === 'public' ? 'Published' : 'Publish'}
               </button>
             </div>
@@ -95,17 +118,22 @@ export function AdminPanel({ me, onPlaytestSession }) {
         <h3>Graph Analysis + Playtest</h3>
         <div className="row">
           <button
+            type="button"
             onClick={() => selectedGame && analyzeMutation.mutate(selectedGame._id)}
             disabled={analyzeMutation.isPending || !selectedGame}
           >
             {analyzeMutation.isPending ? 'Analyzing...' : 'Analyze Selected Game'}
           </button>
+          <label htmlFor="playtest-scene" className="srOnly">Playtest start scene</label>
           <input
+            id="playtest-scene"
             value={startSceneOverride}
             onChange={(e) => setStartSceneOverride(e.target.value)}
             placeholder="Playtest start scene (optional)"
+            aria-label="Playtest start scene override"
           />
           <button
+            type="button"
             onClick={() => selectedGame && playtestMutation.mutate({ gameId: selectedGame._id, startSceneId: startSceneOverride })}
             disabled={!selectedGame || playtestMutation.isPending}
           >
@@ -161,4 +189,4 @@ export function AdminPanel({ me, onPlaytestSession }) {
       {publishMutation.error ? <p className="error">{publishMutation.error.response?.data?.error?.message || 'Publish failed'}</p> : null}
     </section>
   );
-}
+});

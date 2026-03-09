@@ -9,6 +9,9 @@ function gradeSession(session, game) {
   return 'D';
 }
 
+/**
+ * @param {{ session: any, game: any }} props
+ */
 export function EndingPanel({ session, game }) {
   if (!session || !game || session.status === 'active') return null;
   const grade = gradeSession(session, game);

@@ -1,0 +1,94 @@
+:root {
+  color-scheme: light;
+  --bg-top: #f4dfd4;
+  --bg-mid: #f6f0df;
+  --bg-bottom: #dcebe5;
+  --card: #fffaf1;
+  --ink: #1f2f38;
+  --accent: #cc6f4d;
+  --accent-2: #3f8f7b;
+  --line: #d8b5a5;
+  --muted: #5f6f75;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Avenir Next', 'Gill Sans', 'Trebuchet MS', sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 10% 5%, rgba(209, 128, 82, 0.18) 0%, transparent 32%),
+    radial-gradient(circle at 95% 30%, rgba(66, 128, 111, 0.2) 0%, transparent 35%),
+    linear-gradient(170deg, var(--bg-top) 0%, var(--bg-mid) 48%, var(--bg-bottom) 100%);
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0 0 10px;
+  letter-spacing: 0.2px;
+}
+
+input,
+select,
+button {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px;
+  font-size: 14px;
+}
+
+input,
+select {
+  width: 100%;
+  margin: 8px 0;
+  background: #fffefb;
+}
+
+button {
+  background: linear-gradient(180deg, #f0cdbf, #e4b6a3);
+  color: var(--ink);
+  cursor: pointer;
+  transition: transform 140ms ease, filter 140ms ease;
+}
+
+button:hover {
+  filter: saturate(110%);
+  transform: translateY(-1px);
+}
+
+button.active {
+  background: linear-gradient(180deg, #d67856, #b65f3f);
+  color: #fff;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.muted {
+  color: var(--muted);
+  margin: 4px 0;
+}
+
+.error {
+  color: #b42318;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

@@ -1,5 +1,8 @@
 import { UI } from '../constants/ui';
 
+/**
+ * @param {{ game: any }} props
+ */
 export function GraphCanvas({ game }) {
   if (!game) {
     return <p className="muted">Select a game to see graph layout.</p>;
