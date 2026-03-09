@@ -35,7 +35,7 @@ const playerSessionSchema = new mongoose.Schema(
     },
     history: { type: [historyItemSchema], default: [] }
   },
-  { timestamps: true }
+  { timestamps: true, optimisticConcurrency: true }
 );
 
 playerSessionSchema.index({ userId: 1, createdAt: -1 });

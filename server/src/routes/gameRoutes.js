@@ -79,16 +79,30 @@ const gameSchema = z.object({
   scenes: z.array(sceneSchema).min(1)
 });
 
+function getPagination(query) {
+  const page = Math.max(1, Number(query.page || 1));
+  const limit = Math.min(100, Math.max(1, Number(query.limit || 20)));
+  return { page, limit, skip: (page - 1) * limit };
+}
+
 router.get('/public', asyncHandler(async (_req, res) => {
-  const games = await GameTemplate.find({ status: 'public' }).sort({ createdAt: -1 }).lean();
-  return res.json({ games });
+  const { page, limit, skip } = getPagination(_req.query);
+  const [games, total] = await Promise.all([
+    GameTemplate.find({ status: 'public' }).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+    GameTemplate.countDocuments({ status: 'public' })
+  ]);
+  return res.json({ games, pagination: { page, limit, total } });
 }));
 
 router.use(requireAuth);
 
 router.get('/mine', asyncHandler(async (req, res) => {
-  const games = await GameTemplate.find({ adminId: req.user.id }).sort({ updatedAt: -1 }).lean();
-  return res.json({ games });
+  const { page, limit, skip } = getPagination(req.query);
+  const [games, total] = await Promise.all([
+    GameTemplate.find({ adminId: req.user.id }).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean(),
+    GameTemplate.countDocuments({ adminId: req.user.id })
+  ]);
+  return res.json({ games, pagination: { page, limit, total } });
 }));
 
 router.post('/', requireRole('admin'), asyncHandler(async (req, res) => {

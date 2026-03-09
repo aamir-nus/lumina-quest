@@ -98,6 +98,14 @@ function parseUsage(response) {
   return { inputTokens, outputTokens, totalTokens };
 }
 
+function sanitizeForPrompt(input) {
+  return String(input || '')
+    .replace(/[\n\r\t]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 500);
+}
+
 function captureComputeStart() {
   return {
     hr: process.hrtime.bigint(),
@@ -177,8 +185,14 @@ export async function classifyRoute({ gameTitle, sceneNarrative, input, avenues,
   const prompt = [
     `Game: ${gameTitle}`,
     `Scene: ${sceneNarrative}`,
-    `Player input: ${input}`,
-    `Recent turns: ${JSON.stringify(history.slice(-3))}`,
+    `Player input: ${sanitizeForPrompt(input)}`,
+    `Recent turns: ${JSON.stringify(
+      history.slice(-3).map((item) => ({
+        turn: item.turn,
+        userQuery: sanitizeForPrompt(item.userQuery),
+        resolvedAvenueId: item.resolvedAvenueId
+      }))
+    )}`,
     `Avenues: ${JSON.stringify(avenues.map((a) => ({ avenueId: a.avenueId, label: a.label, keywords: a.keywords })))}`,
     `Wildcard enabled: ${wildcardEnabled}`,
     'Return strict JSON only with this shape:',
@@ -275,7 +289,7 @@ export async function generateNarration({
   const prompt = [
     `Game: ${gameTitle}`,
     `Current scene: ${sceneNarrative}`,
-    `Player input: ${playerInput}`,
+    `Player input: ${sanitizeForPrompt(playerInput)}`,
     `Resolution type: ${resolutionType}`,
     `Resolved route label: ${routeLabel || 'n/a'}`,
     `Tone: ${tone}`,

@@ -56,6 +56,17 @@ function mergeCompute(...items) {
   };
 }
 
+async function saveSessionOrThrowConflict(session) {
+  try {
+    await session.save();
+  } catch (error) {
+    if (error?.name === 'VersionError') {
+      throw new ApiError(409, 'SESSION_CONFLICT', 'Session was updated by another action. Retry your move.');
+    }
+    throw error;
+  }
+}
+
 export async function startSessionForUser({ userId, gameId }) {
   const game = await GameTemplate.findOne({ _id: gameId, status: 'public' });
   if (!game) throw new ApiError(404, 'GAME_NOT_FOUND', 'Game not found or not public');
@@ -121,7 +132,7 @@ async function resolveClarification({ session, game, currentScene, payload, clas
   });
   session.visualState.transition = 'pulse';
 
-  await session.save();
+  await saveSessionOrThrowConflict(session);
   addSpan(traceId, 'clarification', { maxTurnsReached });
   endTrace(traceId, { status: session.status, routeType: 'clarification' });
 
@@ -164,7 +175,7 @@ export async function processSessionAction({ userId, payload }) {
 
   if (!currentScene || currentScene.isTerminal || currentScene.avenues.length === 0) {
     resolveTerminal(session, game, traceId);
-    await session.save();
+    await saveSessionOrThrowConflict(session);
     return {
       session,
       resolution: {
@@ -267,7 +278,7 @@ export async function processSessionAction({ userId, payload }) {
   });
 
   session.history[session.history.length - 1].narration = narration.text;
-  await session.save();
+  await saveSessionOrThrowConflict(session);
 
   addSpan(traceId, 'state_update', {
     resolutionType,

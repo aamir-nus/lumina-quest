@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { requireAuth } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import { ApiError } from '../errors/ApiError.js';
+import { llmActionRateLimiter } from '../middleware/security.js';
 import {
   getSessionHistory,
   getSessionSnapshot,
@@ -63,10 +64,6 @@ const actHandler = asyncHandler(async (req, res) => {
   return res.json(result);
 });
 
-router.post('/action', actHandler);
-router.post('/:sessionId/act', (req, _res, next) => {
-  req.body = { ...req.body, sessionId: req.params.sessionId };
-  return next();
-}, actHandler);
+router.post('/action', llmActionRateLimiter, actHandler);
 
 export default router;
