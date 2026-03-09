@@ -331,6 +331,26 @@ button:disabled {
   background: rgba(255, 255, 255, 0.62);
 }
 
+.metricsWidget {
+  margin-top: 8px;
+  border: 1px solid rgba(31, 47, 56, 0.25);
+  border-radius: 8px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.metricsWidget h4 {
+  margin: 0 0 4px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.metricsWidget.compact {
+  margin-top: 6px;
+  padding: 6px;
+}
+
 .animatedScene {
   animation: fadeSlide 280ms ease;
 }

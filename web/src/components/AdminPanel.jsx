@@ -132,6 +132,30 @@ export function AdminPanel({ me, onPlaytestSession }) {
         <p className="muted">
           Fallbacks: {observability.data?.metrics?.fallbacks || 0} | Provider Errors: {observability.data?.metrics?.providerErrors || 0}
         </p>
+        <div className="metricsWidget">
+          <h4>Token Usage</h4>
+          <p className="muted">
+            input: {observability.data?.metrics?.inputTokens || 0} | output: {observability.data?.metrics?.outputTokens || 0} |
+            total: {observability.data?.metrics?.totalTokens || 0}
+          </p>
+        </div>
+        <div className="metricsWidget">
+          <h4>Compute Approx (Current Provider)</h4>
+          <p className="muted">
+            avg latency: {Number(observability.data?.metrics?.computeApprox?.avgLatencyMs || 0).toFixed(1)}ms |
+            avg cpu(user/sys): {Number(observability.data?.metrics?.computeApprox?.avgCpuUserMs || 0).toFixed(1)}/
+            {Number(observability.data?.metrics?.computeApprox?.avgCpuSystemMs || 0).toFixed(1)}ms
+          </p>
+          <p className="muted">
+            avg mem(rss/heap): {Number(observability.data?.metrics?.computeApprox?.avgRssMb || 0).toFixed(1)}/
+            {Number(observability.data?.metrics?.computeApprox?.avgHeapUsedMb || 0).toFixed(1)} MB
+          </p>
+          <p className="muted">
+            {observability.data?.provider === 'lmstudio'
+              ? 'On-device mode active: these values approximate local inference load.'
+              : 'External provider active: values reflect API call handling overhead.'}
+          </p>
+        </div>
       </div>
 
       {publishMutation.error ? <p className="error">{publishMutation.error.response?.data?.error?.message || 'Publish failed'}</p> : null}

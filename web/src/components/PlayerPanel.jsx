@@ -101,7 +101,21 @@ export function PlayerPanel({ me, externalSessionId }) {
               <strong>Route: {lastResolution.type || 'avenue'}</strong>
               <span> confidence {Number(lastResolution.confidence || 0).toFixed(2)}</span>
               {lastResolution.wildcardMode ? <span> | {lastResolution.wildcardMode}</span> : null}
+              {lastResolution.llm?.provider ? <span> | provider: {lastResolution.llm.provider}</span> : null}
               <p>{lastResolution.explanation}</p>
+              <div className="metricsWidget compact">
+                <p className="muted">
+                  tokens in/out/total: {lastResolution.llm?.tokens?.inputTokens || 0}/
+                  {lastResolution.llm?.tokens?.outputTokens || 0}/
+                  {lastResolution.llm?.tokens?.totalTokens || 0}
+                </p>
+                <p className="muted">
+                  compute approx latency/cpu(mem): {Number(lastResolution.llm?.computeApprox?.latencyMs || 0).toFixed(1)}ms /
+                  {Number(lastResolution.llm?.computeApprox?.cpuUserMs || 0).toFixed(1)}+
+                  {Number(lastResolution.llm?.computeApprox?.cpuSystemMs || 0).toFixed(1)}ms (
+                  {Number(lastResolution.llm?.computeApprox?.rssMb || 0).toFixed(1)}MB RSS)
+                </p>
+              </div>
             </div>
           ) : null}
 
