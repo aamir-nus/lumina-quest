@@ -15,6 +15,9 @@ const counters = {
 const computeWindow = [];
 const MAX_COMPUTE_SAMPLES = 50;
 
+/**
+ * Increment route-type counters for resolution analytics.
+ */
 export function recordRouteType(type) {
   counters.total += 1;
   if (type === 'avenue') counters.avenue += 1;
@@ -22,18 +25,30 @@ export function recordRouteType(type) {
   if (type === 'clarification') counters.clarification += 1;
 }
 
+/**
+ * Increment fallback counter when resolver output is corrected.
+ */
 export function recordFallback() {
   counters.fallbacks += 1;
 }
 
+/**
+ * Increment provider error counter.
+ */
 export function recordProviderError() {
   counters.providerErrors += 1;
 }
 
+/**
+ * Increment mock-response counter.
+ */
 export function recordMockResponse() {
   counters.mockResponses += 1;
 }
 
+/**
+ * Record token usage aggregates from one LLM call.
+ */
 export function recordLlmUsage(usage = {}) {
   const input = Number(usage.inputTokens || 0);
   const output = Number(usage.outputTokens || 0);
@@ -45,6 +60,9 @@ export function recordLlmUsage(usage = {}) {
   counters.llmCalls += 1;
 }
 
+/**
+ * Store a compute/memory sample for rolling approximation metrics.
+ */
 export function recordComputeApprox(sample = {}) {
   computeWindow.unshift({
     at: new Date().toISOString(),
@@ -95,6 +113,9 @@ function aggregateCompute() {
   };
 }
 
+/**
+ * Return resolver counters and derived rate/compute aggregates.
+ */
 export function getResolverMetrics() {
   return {
     ...counters,

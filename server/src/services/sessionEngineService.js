@@ -67,6 +67,9 @@ async function saveSessionOrThrowConflict(session) {
   }
 }
 
+/**
+ * Create a new player session from a published game template.
+ */
 export async function startSessionForUser({ userId, gameId }) {
   const game = await GameTemplate.findOne({ _id: gameId, status: 'public' });
   if (!game) throw new ApiError(404, 'GAME_NOT_FOUND', 'Game not found or not public');
@@ -84,6 +87,9 @@ export async function startSessionForUser({ userId, gameId }) {
   return session;
 }
 
+/**
+ * Return session, game, and current-scene snapshot for the player.
+ */
 export async function getSessionSnapshot({ userId, sessionId }) {
   const session = await PlayerSession.findOne({ _id: sessionId, userId }).lean();
   if (!session) throw new ApiError(404, 'SESSION_NOT_FOUND', 'Session not found');
@@ -94,6 +100,9 @@ export async function getSessionSnapshot({ userId, sessionId }) {
   return { session, game, currentScene };
 }
 
+/**
+ * Return persisted session turn history for replay UI.
+ */
 export async function getSessionHistory({ userId, sessionId }) {
   const session = await PlayerSession.findOne({ _id: sessionId, userId }).lean();
   if (!session) throw new ApiError(404, 'SESSION_NOT_FOUND', 'Session not found');
@@ -157,6 +166,9 @@ async function resolveClarification({ session, game, currentScene, payload, clas
   };
 }
 
+/**
+ * Process one player action and persist deterministic game state changes.
+ */
 export async function processSessionAction({ userId, payload }) {
   const session = await PlayerSession.findOne({ _id: payload.sessionId, userId });
   if (!session) throw new ApiError(404, 'SESSION_NOT_FOUND', 'Session not found');

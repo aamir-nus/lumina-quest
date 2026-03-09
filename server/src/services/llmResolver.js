@@ -164,6 +164,9 @@ function heuristicClassify({ input, avenues }) {
   };
 }
 
+/**
+ * Classify player input into an authored avenue, bounded wildcard, or clarification.
+ */
 export async function classifyRoute({ gameTitle, sceneNarrative, input, avenues, history, wildcardEnabled }) {
   const { provider, client } = createClient();
   const fallbackAvenue = avenues[0]?.avenueId || null;
@@ -263,6 +266,9 @@ export async function classifyRoute({ gameTitle, sceneNarrative, input, avenues,
   }
 }
 
+/**
+ * Generate concise narration text for an already-approved resolution outcome.
+ */
 export async function generateNarration({
   gameTitle,
   sceneNarrative,

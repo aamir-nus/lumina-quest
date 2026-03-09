@@ -18,6 +18,9 @@ function clampPoints(mode, game) {
   return Math.max(GAME.MIN_WILDCARD_LOW_POINTS, Math.min(GAME.MAX_WILDCARD_LOW_POINTS, low));
 }
 
+/**
+ * Validate and clamp wildcard route candidates against authored policy constraints.
+ */
 export function evaluateWildcard({ game, currentScene, candidate }) {
   if (!game.wildcardConfig?.enabled) {
     return {

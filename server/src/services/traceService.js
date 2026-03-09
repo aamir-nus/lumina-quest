@@ -7,6 +7,9 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+/**
+ * Start an in-memory trace for request-scoped observability.
+ */
 export function startTrace(name, metadata = {}) {
   const trace = {
     id: `trace_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -22,6 +25,9 @@ export function startTrace(name, metadata = {}) {
   return trace.id;
 }
 
+/**
+ * Add a timestamped span payload into an existing trace.
+ */
 export function addSpan(traceId, name, data = {}) {
   const trace = traces.find((item) => item.id === traceId);
   if (!trace) return;
@@ -33,6 +39,9 @@ export function addSpan(traceId, name, data = {}) {
   });
 }
 
+/**
+ * Close a trace and enqueue optional external sink delivery.
+ */
 export function endTrace(traceId, result = {}) {
   const trace = traces.find((item) => item.id === traceId);
   if (!trace) return;
@@ -42,6 +51,9 @@ export function endTrace(traceId, result = {}) {
   void pushLangfuseTrace(trace);
 }
 
+/**
+ * Return recent trace entries, newest first.
+ */
 export function getRecentTraces(limit = 20) {
   return traces.slice(0, limit);
 }

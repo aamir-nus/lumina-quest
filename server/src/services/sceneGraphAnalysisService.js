@@ -1,3 +1,5 @@
+import { GAME } from '../constants/appConstants.js';
+
 function bySceneId(game) {
   return Object.fromEntries((game.scenes || []).map((scene) => [scene.sceneId, scene]));
 }
@@ -91,6 +93,9 @@ function calcPointBounds(game) {
   };
 }
 
+/**
+ * Analyze reachability, point-balance, and turn economy of an authored game graph.
+ */
 export function analyzeGameGraph(game) {
   const allSceneIds = new Set((game.scenes || []).map((scene) => scene.sceneId));
   const reachable = reachableFromStart(game);
@@ -105,4 +110,3 @@ export function analyzeGameGraph(game) {
     turnEconomy: calcTurnEconomy(game)
   };
 }
-import { GAME } from '../constants/appConstants.js';
