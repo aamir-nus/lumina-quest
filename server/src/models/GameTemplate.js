@@ -20,7 +20,7 @@ const avenueSchema = new mongoose.Schema(
 
 const sceneSchema = new mongoose.Schema(
   {
-    sceneId: { type: String, required: true },
+    sceneId: { type: String, required: true, match: [/^[a-zA-Z0-9_-]+$/, 'Invalid sceneId format'] },
     narrative: { type: String, required: true },
     imageKey: { type: String, default: '' },
     isTerminal: { type: Boolean, default: false },

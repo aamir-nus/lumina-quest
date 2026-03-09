@@ -10,6 +10,7 @@ export const env = {
   mongoConnectRetryDelayMs: Number(process.env.MONGO_CONNECT_RETRY_DELAY_MS || 2000),
   jwtSecret: process.env.JWT_SECRET,
   clientOrigin: process.env.CLIENT_ORIGIN || 'http://localhost:5173',
+  corsAllowNoOrigin: process.env.CORS_ALLOW_NO_ORIGIN === 'true',
   requestJsonLimit: process.env.REQUEST_JSON_LIMIT || '256kb',
   llmProvider: process.env.LLM_PROVIDER || 'openrouter',
   openRouterApiKey: process.env.OPENROUTER_API_KEY || '',

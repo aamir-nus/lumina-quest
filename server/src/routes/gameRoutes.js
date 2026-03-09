@@ -111,7 +111,16 @@ router.post('/', requireRole('admin'), asyncHandler(async (req, res) => {
     throw new ApiError(400, 'INVALID_GAME_PAYLOAD', 'Invalid game payload', parsed.error.flatten());
   }
 
-  const game = await GameTemplate.create({ ...parsed.data, adminId: req.user.id });
+  const mongoSession = await mongoose.startSession();
+  let game;
+  try {
+    await mongoSession.withTransaction(async () => {
+      game = new GameTemplate({ ...parsed.data, adminId: req.user.id });
+      await game.save({ session: mongoSession });
+    });
+  } finally {
+    await mongoSession.endSession();
+  }
   return res.status(201).json({ game });
 }));
 
@@ -125,11 +134,19 @@ router.put('/:id', requireRole('admin'), asyncHandler(async (req, res) => {
     throw new ApiError(400, 'INVALID_GAME_PAYLOAD', 'Invalid game payload', parsed.error.flatten());
   }
 
-  const game = await GameTemplate.findOneAndUpdate(
-    { _id: req.params.id, adminId: req.user.id },
-    { ...parsed.data, status: 'draft' },
-    { new: true }
-  );
+  const mongoSession = await mongoose.startSession();
+  let game = null;
+  try {
+    await mongoSession.withTransaction(async () => {
+      game = await GameTemplate.findOneAndUpdate(
+        { _id: req.params.id, adminId: req.user.id },
+        { ...parsed.data, status: 'draft' },
+        { new: true, session: mongoSession }
+      );
+    });
+  } finally {
+    await mongoSession.endSession();
+  }
 
   if (!game) {
     throw new ApiError(404, 'GAME_NOT_FOUND', 'Game not found');
@@ -143,18 +160,26 @@ router.post('/:id/publish', requireRole('admin'), asyncHandler(async (req, res) 
     throw new ApiError(400, 'INVALID_GAME_ID', 'Invalid game id');
   }
 
-  const game = await GameTemplate.findOne({ _id: req.params.id, adminId: req.user.id });
-  if (!game) {
-    throw new ApiError(404, 'GAME_NOT_FOUND', 'Game not found');
-  }
+  const mongoSession = await mongoose.startSession();
+  let game = null;
+  try {
+    await mongoSession.withTransaction(async () => {
+      game = await GameTemplate.findOne({ _id: req.params.id, adminId: req.user.id }).session(mongoSession);
+      if (!game) {
+        throw new ApiError(404, 'GAME_NOT_FOUND', 'Game not found');
+      }
 
-  const result = validatePublishability(game);
-  if (!result.ok) {
-    throw new ApiError(400, 'GAME_NOT_PUBLISHABLE', 'Game is not publishable', result.errors);
-  }
+      const result = validatePublishability(game);
+      if (!result.ok) {
+        throw new ApiError(400, 'GAME_NOT_PUBLISHABLE', 'Game is not publishable', result.errors);
+      }
 
-  game.status = 'public';
-  await game.save();
+      game.status = 'public';
+      await game.save({ session: mongoSession });
+    });
+  } finally {
+    await mongoSession.endSession();
+  }
   return res.json({ game });
 }));
 
