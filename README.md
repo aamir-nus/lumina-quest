@@ -37,14 +37,18 @@ flowchart TD
 1. `npm install`
 2. `cp .env.example .env`
 3. Set `JWT_SECRET` (24+ chars)
-4. `npm run mongo:up`
-5. `npm run dev`
+4. Optional CORS strictness:
+   - `CLIENT_ORIGIN=http://localhost:5173`
+   - `CORS_ALLOW_NO_ORIGIN=false`
+5. `npm run mongo:up`
+6. `npm run dev`
 
 ## Auth + API Notes
 - Auth is cookie-first (`httpOnly` cookie set on login/register, cleared on logout).
 - Frontend API client uses `withCredentials: true`.
 - Canonical action endpoint is `POST /api/sessions/action`.
 - Every API response includes `x-request-id` for tracing failures.
+- Frontend API base URL is configurable via `VITE_API_BASE_URL`.
 
 ## LLM Provider Switch
 - `LLM_PROVIDER=openrouter`

@@ -29,6 +29,7 @@
 
 ## QA / Deployability
 - [x] Validate server tests + syntax checks + web build
+- [x] Run strict pending-item remediation pass from consolidated review report
 - [x] Add/update Docker build instructions for linux/amd64, linux/arm64
 - [x] Keep image footprint lightweight and avoid build artifacts in git
 - [ ] Validate Docker image build execution in current sandbox (blocked: Docker daemon unavailable)

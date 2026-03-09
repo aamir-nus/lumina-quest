@@ -15,6 +15,12 @@
   - request-id propagation (`x-request-id`)
   - optimistic concurrency conflict protection on session saves
   - canonical session action endpoint (`POST /sessions/action`)
+  - strict-pass closure for pending findings:
+    - transaction wrapping for game write paths
+    - content-length request guard and stricter CORS origin behavior
+    - DB connection lifecycle event logging
+    - loading/error states + accessibility labels in admin/player/auth flows
+    - split CSS into modular files for maintainability
 
 ## Issues Faced and Solved
 - Needed visual-state continuity between backend and frontend.
@@ -32,6 +38,7 @@
 - MLX direct runtime integration not implemented.
 - WebGPU direct runtime integration not implemented.
 - Docker image build execution could not be fully verified in this sandbox (`docker.sock` unavailable).
+- Could not install additional npm packages due offline sandbox (no `registry.npmjs.org` access), so frontend type-safety was improved with JSDoc/runtime-safe patterns instead of `prop-types`.
 
 ## Why Not Delivered
 - Added only one on-device provider (`lmstudio`) this pass to keep implementation stable and avoid broad runtime complexity across platforms.

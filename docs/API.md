@@ -117,3 +117,7 @@ Game schema (core additions):
 ```
 
 All API responses include `x-request-id` response header for tracing.
+
+## Client Config
+- `VITE_API_BASE_URL` configures the web client API base URL.
+- Cookie auth requires client requests with credentials enabled.
