@@ -35,6 +35,7 @@
 - [x] Add stateful transition effects tied to avenue resolution
 - [x] Add ending grading/cutscene views
 - [x] Add config-driven provider switch (`openrouter` + `lmstudio`)
+- [x] Apply post-review hardening patch set (cookie auth restore, request IDs, action race conflict handling, prompt/input sanitization)
 - [x] Update README with final architecture and entrypoints
 - [ ] Validate Docker image builds end-to-end in current sandbox (blocked by daemon access)
 - [ ] Add MLX provider adapter (future)

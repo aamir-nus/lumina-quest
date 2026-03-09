@@ -10,6 +10,11 @@
 - Added UI widgets for:
   - token usage (input/output/total)
   - compute/memory approximation during LLM requests
+- Added hardening follow-through after code review:
+  - cookie-first auth restore endpoint (`GET /auth/me`)
+  - request-id propagation (`x-request-id`)
+  - optimistic concurrency conflict protection on session saves
+  - canonical session action endpoint (`POST /sessions/action`)
 
 ## Issues Faced and Solved
 - Needed visual-state continuity between backend and frontend.
@@ -18,6 +23,10 @@
   - Solved via provider abstraction in resolver with env-driven switch.
 - Needed minimal-risk presentation polish.
   - Solved via composable stage components (`GameStage`, `SceneTransitionOverlay`, `EndingPanel`).
+- Needed to reduce auth/session security risk from review findings.
+  - Solved by removing localStorage auth persistence and moving to cookie-based restore flow.
+- Needed safer concurrent action handling.
+  - Solved by enabling optimistic concurrency and returning explicit `SESSION_CONFLICT` on stale writes.
 
 ## Issues Faced But Not Delivered
 - MLX direct runtime integration not implemented.

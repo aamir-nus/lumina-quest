@@ -13,6 +13,8 @@
 - [x] Add LLM provider switch (`openrouter` + `lmstudio`) via env config
 - [x] Keep OpenRouter path intact as historical external API fallback
 - [x] Document provider setup and limits
+- [x] Add request-id middleware and error payload trace correlation
+- [x] Enforce session write conflict handling with optimistic concurrency
 
 ## Frontend - 8-bit Stage Experience
 - [x] Build `GameStage` layer renderer (background/foreground/sprite)
@@ -22,6 +24,8 @@
 - [x] Add pixel UI polish (typography, borders, transitions, chips)
 - [x] Add token usage widget (admin + player views)
 - [x] Add compute/memory approximation widget for LLM calls
+- [x] Move to cookie-first auth restore (`GET /auth/me`) with `withCredentials`
+- [x] Remove localStorage-based auth persistence
 
 ## QA / Deployability
 - [x] Validate server tests + syntax checks + web build

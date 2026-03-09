@@ -7,6 +7,8 @@ Base paths:
 ## Auth
 - `POST /auth/register`
 - `POST /auth/login`
+- `POST /auth/logout`
+- `GET /auth/me` (cookie or bearer auth required)
 
 ## Games
 - `GET /games/public`
@@ -23,9 +25,18 @@ Game schema (core additions):
 - `POST /sessions/start`
 - `GET /sessions/:sessionId`
 - `GET /sessions/:sessionId/history`
-- `POST /sessions/:sessionId/act`
+- `POST /sessions/action`
 
-`POST /sessions/:sessionId/act` response (important contract):
+`POST /sessions/action` request:
+```json
+{
+  "sessionId": "mongo-id",
+  "userInput": "free form player text",
+  "tone": "cinematic"
+}
+```
+
+`POST /sessions/action` response (important contract):
 ```json
 {
   "session": {},
@@ -104,3 +115,5 @@ Game schema (core additions):
   }
 }
 ```
+
+All API responses include `x-request-id` response header for tracing.

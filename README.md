@@ -40,6 +40,12 @@ flowchart TD
 4. `npm run mongo:up`
 5. `npm run dev`
 
+## Auth + API Notes
+- Auth is cookie-first (`httpOnly` cookie set on login/register, cleared on logout).
+- Frontend API client uses `withCredentials: true`.
+- Canonical action endpoint is `POST /api/sessions/action`.
+- Every API response includes `x-request-id` for tracing failures.
+
 ## LLM Provider Switch
 - `LLM_PROVIDER=openrouter`
 - `LLM_PROVIDER=lmstudio`
