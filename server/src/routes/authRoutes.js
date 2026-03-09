@@ -7,8 +7,19 @@ import { env } from '../config/env.js';
 import { AUTH } from '../constants/appConstants.js';
 import { ApiError } from '../errors/ApiError.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = express.Router();
+const DUMMY_PASSWORD_HASH = '$2b$10$0iqfFm8vA2xqf2bR.6M1x..xDORfNeiQk4SUfD2/eKTz9ZhuttW9K';
+
+function setAuthCookie(res, token) {
+  res.cookie('auth_token', token, {
+    httpOnly: true,
+    secure: env.nodeEnv === 'production',
+    sameSite: 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000
+  });
+}
 
 const authSchema = z.object({
   email: z.string().email(),
@@ -34,6 +45,7 @@ router.post('/register', asyncHandler(async (req, res) => {
   const token = jwt.sign({ id: user._id.toString(), role: user.role, email: user.email }, env.jwtSecret, {
     expiresIn: AUTH.JWT_EXPIRES_IN
   });
+  setAuthCookie(res, token);
 
   return res.status(201).json({ token, user: { id: user._id, email: user.email, role: user.role } });
 }));
@@ -47,6 +59,7 @@ router.post('/login', asyncHandler(async (req, res) => {
   const { email, password } = parsed.data;
   const user = await User.findOne({ email });
   if (!user) {
+    await bcrypt.compare(password, DUMMY_PASSWORD_HASH);
     throw new ApiError(401, 'INVALID_CREDENTIALS', 'Invalid credentials');
   }
 
@@ -58,8 +71,18 @@ router.post('/login', asyncHandler(async (req, res) => {
   const token = jwt.sign({ id: user._id.toString(), role: user.role, email: user.email }, env.jwtSecret, {
     expiresIn: AUTH.JWT_EXPIRES_IN
   });
+  setAuthCookie(res, token);
 
   return res.json({ token, user: { id: user._id, email: user.email, role: user.role } });
+}));
+
+router.post('/logout', asyncHandler(async (_req, res) => {
+  res.clearCookie('auth_token');
+  return res.json({ ok: true });
+}));
+
+router.get('/me', requireAuth, asyncHandler(async (req, res) => {
+  return res.json({ user: req.user });
 }));
 
 export default router;

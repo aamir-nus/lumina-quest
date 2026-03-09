@@ -1,7 +1,17 @@
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 
-export const securityHeaders = helmet();
+export const securityHeaders = helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:'],
+      connectSrc: ["'self'"]
+    }
+  }
+});
 
 export const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -25,6 +35,19 @@ export const apiRateLimiter = rateLimit({
     error: {
       code: 'RATE_LIMITED',
       message: 'Too many requests. Try again later.'
+    }
+  }
+});
+
+export const llmActionRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: {
+      code: 'LLM_RATE_LIMITED',
+      message: 'Too many action requests. Slow down and try again.'
     }
   }
 });

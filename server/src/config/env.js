@@ -8,7 +8,7 @@ export const env = {
   mongoUri: process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/luminaquest',
   mongoConnectRetries: Number(process.env.MONGO_CONNECT_RETRIES || 5),
   mongoConnectRetryDelayMs: Number(process.env.MONGO_CONNECT_RETRY_DELAY_MS || 2000),
-  jwtSecret: process.env.JWT_SECRET || '',
+  jwtSecret: process.env.JWT_SECRET,
   clientOrigin: process.env.CLIENT_ORIGIN || 'http://localhost:5173',
   requestJsonLimit: process.env.REQUEST_JSON_LIMIT || '256kb',
   llmProvider: process.env.LLM_PROVIDER || 'openrouter',

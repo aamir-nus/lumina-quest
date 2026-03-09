@@ -10,11 +10,13 @@ export function notFoundHandler(req, res) {
 }
 
 export function errorHandler(err, _req, res, _next) {
+  const requestId = _req.requestId || 'n/a';
   const status = err.status || 500;
   const code = err.code || 'INTERNAL_SERVER_ERROR';
   const message = status >= 500 ? 'Internal server error' : err.message;
 
   logger.error('Request failed', {
+    requestId,
     code,
     status,
     message: err.message,
@@ -26,6 +28,7 @@ export function errorHandler(err, _req, res, _next) {
     error: {
       code,
       message,
+      requestId,
       ...(err.details ? { details: err.details } : {})
     }
   });

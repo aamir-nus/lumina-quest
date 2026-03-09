@@ -3,7 +3,7 @@ import { env } from '../config/env.js';
 import { ApiError } from '../errors/ApiError.js';
 
 export function requireAuth(req, res, next) {
-  const token = req.headers.authorization?.replace('Bearer ', '');
+  const token = req.headers.authorization?.replace('Bearer ', '') || req.cookies?.auth_token;
   if (!token) {
     return next(new ApiError(401, 'MISSING_TOKEN', 'Missing token'));
   }
