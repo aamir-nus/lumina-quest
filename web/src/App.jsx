@@ -1,31 +1,36 @@
 import { useEffect, useMemo, useState } from 'react';
-import { setAuthToken } from './api';
+import { api } from './api';
 import { AuthPanel } from './components/AuthPanel';
 import { AdminPanel } from './components/AdminPanel';
 import { PlayerPanel } from './components/PlayerPanel';
-import { safeStorageGet, safeStorageRemove, safeStorageSet } from './utils/storage';
-
-const AUTH_KEY = 'luminaquest.auth';
 
 export default function App() {
-  const [auth, setAuth] = useState(() => safeStorageGet(AUTH_KEY, null));
+  const [auth, setAuth] = useState(null);
   const [playtestSessionId, setPlaytestSessionId] = useState('');
 
   const me = useMemo(() => auth?.user || null, [auth]);
 
   useEffect(() => {
-    setAuthToken(auth?.token || '');
-  }, [auth?.token]);
+    let active = true;
+    api.get('/auth/me')
+      .then((res) => {
+        if (active) setAuth({ user: res.data.user });
+      })
+      .catch(() => {
+        if (active) setAuth(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const onAuth = (nextAuth) => {
-    safeStorageSet(AUTH_KEY, nextAuth);
-    setAuth(nextAuth);
+    setAuth({ user: nextAuth.user });
   };
 
   const logout = () => {
-    safeStorageRemove(AUTH_KEY);
+    api.post('/auth/logout').catch(() => {});
     setAuth(null);
-    setAuthToken('');
   };
 
   return (

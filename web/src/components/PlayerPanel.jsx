@@ -5,6 +5,10 @@ import { EndingPanel } from './EndingPanel';
 import { GameStage } from './GameStage';
 import { SceneTransitionOverlay } from './SceneTransitionOverlay';
 
+function sanitizeClientInput(value) {
+  return String(value || '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 500);
+}
+
 export function PlayerPanel({ me, externalSessionId }) {
   const [sessionId, setSessionId] = useState('');
   const [input, setInput] = useState('');
@@ -38,7 +42,11 @@ export function PlayerPanel({ me, externalSessionId }) {
   });
 
   const actionMutation = useMutation({
-    mutationFn: async () => (await api.post(`/sessions/${sessionId}/act`, { userInput: input, tone: 'cinematic' })).data,
+    mutationFn: async () => (await api.post('/sessions/action', {
+      sessionId,
+      userInput: sanitizeClientInput(input),
+      tone: 'cinematic'
+    })).data,
     onSuccess: (data) => {
       setInput('');
       setLastResolution(data.resolution);

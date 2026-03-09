@@ -4,7 +4,7 @@ import { api } from '../api';
 
 export function AuthPanel({ onAuth }) {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('password123');
+  const [password, setPassword] = useState('');
   const [role, setRole] = useState('user');
   const [mode, setMode] = useState('login');
 

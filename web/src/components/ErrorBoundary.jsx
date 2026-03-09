@@ -14,13 +14,18 @@ export class ErrorBoundary extends React.Component {
     console.error('UI boundary caught error', error);
   }
 
+  reset = () => {
+    this.setState({ hasError: false });
+  };
+
   render() {
     if (this.state.hasError) {
       return (
         <main>
           <section className="card">
             <h2>Something went wrong</h2>
-            <p className="muted">Please reload the page.</p>
+            <p className="muted">Try resetting the UI state.</p>
+            <button onClick={this.reset}>Reset View</button>
           </section>
         </main>
       );
