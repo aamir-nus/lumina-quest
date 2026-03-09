@@ -20,6 +20,8 @@
 - [x] Build `EndingPanel` with victory/defeat grading
 - [x] Integrate stage into player flow with response-driven visual state
 - [x] Add pixel UI polish (typography, borders, transitions, chips)
+- [x] Add token usage widget (admin + player views)
+- [x] Add compute/memory approximation widget for LLM calls
 
 ## QA / Deployability
 - [x] Validate server tests + syntax checks + web build
@@ -31,6 +33,7 @@
 - [x] Update iteration checklist and implementation plan status
 - [x] Add Iteration 3 summary with delivered items/blockers
 - [x] Update README with Iteration 3 diagrams + run/build instructions
+- [x] Add Mermaid UI mockups for workflow expectations
 - [x] Create `for-admin.md`
 - [x] Create `for-user.md`
 

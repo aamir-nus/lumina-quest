@@ -7,6 +7,9 @@
 - Added configurable provider switch for LLM inference:
   - `LLM_PROVIDER=openrouter`
   - `LLM_PROVIDER=lmstudio`
+- Added UI widgets for:
+  - token usage (input/output/total)
+  - compute/memory approximation during LLM requests
 
 ## Issues Faced and Solved
 - Needed visual-state continuity between backend and frontend.

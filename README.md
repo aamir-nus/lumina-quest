@@ -14,6 +14,14 @@ flowchart LR
   F --> G["8-bit Stage + Transition Overlay + Ending Grade"]
 ```
 
+## New UI Widgets
+- Admin observability panel now shows:
+  - token consumption (`input`, `output`, `total`)
+  - compute/memory approximation (latency, CPU, RSS, heap)
+- Player resolution badge now shows per-action:
+  - token consumption
+  - compute approximation
+
 ## Iteration Status
 
 ```mermaid
@@ -26,7 +34,6 @@ flowchart TD
 ```
 
 ## Run Locally
-
 1. `npm install`
 2. `cp .env.example .env`
 3. Set `JWT_SECRET` (24+ chars)
@@ -34,44 +41,25 @@ flowchart TD
 5. `npm run dev`
 
 ## LLM Provider Switch
-
-Environment variable:
-- `LLM_PROVIDER=openrouter` (external API)
-- `LLM_PROVIDER=lmstudio` (on-device local API, OpenAI-compatible)
-
-Provider config vars:
-- OpenRouter: `OPENROUTER_*`
-- LM Studio: `LMSTUDIO_BASE_URL`, `LMSTUDIO_API_KEY`, `LMSTUDIO_MODEL`
+- `LLM_PROVIDER=openrouter`
+- `LLM_PROVIDER=lmstudio`
 
 ## Docker (Lightweight, Multi-Arch)
-
-Server image build:
 ```bash
+# linux x64
 docker buildx build --platform linux/amd64 -f server/Dockerfile -t luminaquest-server:amd64 .
-docker buildx build --platform linux/arm64 -f server/Dockerfile -t luminaquest-server:arm64 .
-```
-
-Web image build:
-```bash
 docker buildx build --platform linux/amd64 -f web/Dockerfile -t luminaquest-web:amd64 .
+
+# arm64 (Apple Silicon + Linux ARM)
+docker buildx build --platform linux/arm64 -f server/Dockerfile -t luminaquest-server:arm64 .
 docker buildx build --platform linux/arm64 -f web/Dockerfile -t luminaquest-web:arm64 .
 ```
 
-Single command multi-platform build (if pushing to a registry):
-```bash
-docker buildx build --platform linux/amd64,linux/arm64 -f server/Dockerfile -t <registry>/luminaquest-server:latest --push .
-docker buildx build --platform linux/amd64,linux/arm64 -f web/Dockerfile -t <registry>/luminaquest-web:latest --push .
-```
-
-Note:
-- In this sandbox, Docker daemon access may be unavailable; if so, run these commands on a host with Docker Engine running.
-
-## Key Docs
-
+## Docs
+- [API Overview](/Users/aamirsyedaltaf/Documents/lumina-quest/docs/API.md)
+- [UI Mockups](/Users/aamirsyedaltaf/Documents/lumina-quest/docs/UI_MOCKUPS.md)
 - [Iteration Checklist](/Users/aamirsyedaltaf/Documents/lumina-quest/docs/ITERATION_CHECKLIST.md)
 - [Iteration 3 Execution](/Users/aamirsyedaltaf/Documents/lumina-quest/docs/ITERATION_3_EXECUTION.md)
 - [Iteration 3 Summary](/Users/aamirsyedaltaf/Documents/lumina-quest/docs/ITERATION_3_SUMMARY.md)
-- [Hardening Checklist](/Users/aamirsyedaltaf/Documents/lumina-quest/docs/ITERATION_2_HARDENING.md)
-- [API Overview](/Users/aamirsyedaltaf/Documents/lumina-quest/docs/API.md)
 - [Admin Guide](/Users/aamirsyedaltaf/Documents/lumina-quest/for-admin.md)
 - [User Guide](/Users/aamirsyedaltaf/Documents/lumina-quest/for-user.md)
