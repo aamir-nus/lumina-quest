@@ -31,6 +31,31 @@ function applyVisualEffects(baseState, avenue) {
   };
 }
 
+function mergeUsage(...items) {
+  return items.reduce(
+    (acc, usage) => {
+      if (!usage) return acc;
+      acc.inputTokens += Number(usage.inputTokens || 0);
+      acc.outputTokens += Number(usage.outputTokens || 0);
+      acc.totalTokens += Number(usage.totalTokens || 0);
+      return acc;
+    },
+    { inputTokens: 0, outputTokens: 0, totalTokens: 0 }
+  );
+}
+
+function mergeCompute(...items) {
+  const valid = items.filter(Boolean);
+  if (valid.length === 0) return null;
+  return {
+    latencyMs: valid.reduce((a, b) => a + Number(b.latencyMs || 0), 0),
+    cpuUserMs: valid.reduce((a, b) => a + Number(b.cpuUserMs || 0), 0),
+    cpuSystemMs: valid.reduce((a, b) => a + Number(b.cpuSystemMs || 0), 0),
+    rssMb: Math.max(...valid.map((b) => Number(b.rssMb || 0))),
+    heapUsedMb: Math.max(...valid.map((b) => Number(b.heapUsedMb || 0)))
+  };
+}
+
 export async function startSessionForUser({ userId, gameId }) {
   const game = await GameTemplate.findOne({ _id: gameId, status: 'public' });
   if (!game) throw new ApiError(404, 'GAME_NOT_FOUND', 'Game not found or not public');
@@ -111,6 +136,11 @@ async function resolveClarification({ session, game, currentScene, payload, clas
       explanation: classified.explanation || 'Need more detail to map your intent safely.',
       narration: narration.text,
       providerResponse: classified.providerResponse,
+      llm: {
+        provider: classified.provider || narration.provider || 'unknown',
+        tokens: mergeUsage(classified.usage, narration.usage),
+        computeApprox: mergeCompute(classified.computeApprox, narration.computeApprox)
+      },
       traceId
     }
   };
@@ -258,6 +288,11 @@ export async function processSessionAction({ userId, payload }) {
       explanation,
       narration: narration.text,
       providerResponse: classified.providerResponse,
+      llm: {
+        provider: classified.provider || narration.provider || 'unknown',
+        tokens: mergeUsage(classified.usage, narration.usage),
+        computeApprox: mergeCompute(classified.computeApprox, narration.computeApprox)
+      },
       traceId
     }
   };

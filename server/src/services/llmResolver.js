@@ -3,6 +3,8 @@ import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 import {
   recordFallback,
+  recordComputeApprox,
+  recordLlmUsage,
   recordMockResponse,
   recordProviderError,
   recordRouteType
@@ -84,6 +86,41 @@ function parseOutput(response, fallback = {}) {
   }
 }
 
+function parseUsage(response) {
+  const usage = response?.usage || {};
+  const inputTokens = Number(
+    usage.input_tokens ?? usage.prompt_tokens ?? usage.inputTokenCount ?? usage.promptTokenCount ?? 0
+  );
+  const outputTokens = Number(
+    usage.output_tokens ?? usage.completion_tokens ?? usage.outputTokenCount ?? usage.candidatesTokenCount ?? 0
+  );
+  const totalTokens = Number(usage.total_tokens ?? usage.totalTokenCount ?? inputTokens + outputTokens);
+  return { inputTokens, outputTokens, totalTokens };
+}
+
+function captureComputeStart() {
+  return {
+    hr: process.hrtime.bigint(),
+    cpu: process.cpuUsage()
+  };
+}
+
+function captureComputeEnd(provider, start) {
+  const elapsedNs = process.hrtime.bigint() - start.hr;
+  const cpuDiff = process.cpuUsage(start.cpu);
+  const mem = process.memoryUsage();
+  const sample = {
+    provider,
+    latencyMs: Number(elapsedNs) / 1e6,
+    cpuUserMs: cpuDiff.user / 1000,
+    cpuSystemMs: cpuDiff.system / 1000,
+    rssMb: mem.rss / (1024 * 1024),
+    heapUsedMb: mem.heapUsed / (1024 * 1024)
+  };
+  recordComputeApprox(sample);
+  return sample;
+}
+
 function heuristicClassify({ input, avenues }) {
   const normalized = input.toLowerCase();
   const matched = avenues.find((avenue) => {
@@ -127,9 +164,12 @@ export async function classifyRoute({ gameTitle, sceneNarrative, input, avenues,
   if (!provider.hasApiKey) {
     recordMockResponse();
     recordRouteType(heuristic.routeType);
+    recordLlmUsage({ inputTokens: 0, outputTokens: 0, totalTokens: 0 });
     return {
       ...heuristic,
       provider: provider.provider,
+      usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+      computeApprox: null,
       providerResponse: mockResponse({ ...heuristic, reason: 'mock_no_api_key' })
     };
   }
@@ -147,6 +187,7 @@ export async function classifyRoute({ gameTitle, sceneNarrative, input, avenues,
   ].join('\n');
 
   try {
+    const computeStart = captureComputeStart();
     const response = await client.responses.create({
       model: provider.model,
       input: [
@@ -167,6 +208,9 @@ export async function classifyRoute({ gameTitle, sceneNarrative, input, avenues,
     });
 
     const parsed = parseOutput(response, heuristic);
+    const usage = parseUsage(response);
+    const computeApprox = captureComputeEnd(provider.provider, computeStart);
+    recordLlmUsage(usage);
     const routeType = ['avenue', 'wildcard', 'clarification'].includes(parsed.routeType)
       ? parsed.routeType
       : heuristic.routeType;
@@ -184,6 +228,8 @@ export async function classifyRoute({ gameTitle, sceneNarrative, input, avenues,
       explanation: parsed.explanation || 'Mapped by classifier.',
       wildcard: parsed.wildcard || null,
       provider: provider.provider,
+      usage,
+      computeApprox,
       providerResponse: response
     };
   } catch (error) {
@@ -191,10 +237,13 @@ export async function classifyRoute({ gameTitle, sceneNarrative, input, avenues,
     recordProviderError();
     recordMockResponse();
     recordRouteType(heuristic.routeType);
+    recordLlmUsage({ inputTokens: 0, outputTokens: 0, totalTokens: 0 });
     return {
       ...heuristic,
       avenueId: heuristic.avenueId || fallbackAvenue,
       provider: provider.provider,
+      usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+      computeApprox: null,
       providerResponse: mockResponse({ ...heuristic, reason: 'mock_provider_error' })
     };
   }
@@ -213,9 +262,12 @@ export async function generateNarration({
 
   if (!provider.hasApiKey) {
     recordMockResponse();
+    recordLlmUsage({ inputTokens: 0, outputTokens: 0, totalTokens: 0 });
     return {
       text: `${fallbackText} ${sceneNarrative}`,
       provider: provider.provider,
+      usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+      computeApprox: null,
       providerResponse: mockResponse({ narration: fallbackText, reason: 'mock_no_api_key' })
     };
   }
@@ -231,6 +283,7 @@ export async function generateNarration({
   ].join('\n');
 
   try {
+    const computeStart = captureComputeStart();
     const response = await client.responses.create({
       model: provider.model,
       input: [
@@ -246,14 +299,26 @@ export async function generateNarration({
     });
 
     const parsed = parseOutput(response, { text: fallbackText });
-    return { text: parsed.text || fallbackText, provider: provider.provider, providerResponse: response };
+    const usage = parseUsage(response);
+    const computeApprox = captureComputeEnd(provider.provider, computeStart);
+    recordLlmUsage(usage);
+    return {
+      text: parsed.text || fallbackText,
+      provider: provider.provider,
+      usage,
+      computeApprox,
+      providerResponse: response
+    };
   } catch (error) {
     logger.error('Narration provider call failed', { message: error.message });
     recordProviderError();
     recordMockResponse();
+    recordLlmUsage({ inputTokens: 0, outputTokens: 0, totalTokens: 0 });
     return {
       text: `${fallbackText} ${sceneNarrative}`,
       provider: provider.provider,
+      usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+      computeApprox: null,
       providerResponse: mockResponse({ narration: fallbackText, reason: 'mock_provider_error' })
     };
   }
