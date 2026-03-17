@@ -71,5 +71,6 @@ docker buildx build --platform linux/arm64 -f web/Dockerfile -t luminaquest-web:
 - [Iteration Checklist](/Users/aamirsyedaltaf/Documents/lumina-quest/docs/ITERATION_CHECKLIST.md)
 - [Iteration 3 Execution](/Users/aamirsyedaltaf/Documents/lumina-quest/docs/ITERATION_3_EXECUTION.md)
 - [Iteration 3 Summary](/Users/aamirsyedaltaf/Documents/lumina-quest/docs/ITERATION_3_SUMMARY.md)
+- [Strict Pass Report](/Users/aamirsyedaltaf/Documents/lumina-quest/docs/STRICT_PASS_REPORT.md)
 - [Admin Guide](/Users/aamirsyedaltaf/Documents/lumina-quest/for-admin.md)
 - [User Guide](/Users/aamirsyedaltaf/Documents/lumina-quest/for-user.md)
