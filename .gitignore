@@ -211,3 +211,11 @@ node_modules/
 **/dist/
 .claude/
 *.ipynb
+
+# Internal iteration tracking (not for public repo)
+docs/ITERATION_*.md
+docs/*_SUMMARY.md
+docs/*_EXECUTION.md
+docs/*_HARDENING.md
+docs/*_CHECKLIST.md
+docs/*_REPORT.md
