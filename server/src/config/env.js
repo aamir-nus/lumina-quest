@@ -1,6 +1,8 @@
 import dotenv from 'dotenv';
+import { resolve } from 'path';
 
-dotenv.config();
+//when running from 'server/' directory, .env is in parent directory
+dotenv.config({ path: resolve(process.cwd(), '../.env') });
 
 export const env = {
   nodeEnv: process.env.NODE_ENV || 'development',

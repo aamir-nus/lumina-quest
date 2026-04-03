@@ -111,15 +111,26 @@ router.post('/', requireRole('admin'), asyncHandler(async (req, res) => {
     throw new ApiError(400, 'INVALID_GAME_PAYLOAD', 'Invalid game payload', parsed.error.flatten());
   }
 
-  const mongoSession = await mongoose.startSession();
+  //try transaction, fall back to non-transactional for standalone mongoDB
   let game;
   try {
-    await mongoSession.withTransaction(async () => {
+    const mongoSession = await mongoose.startSession();
+    try {
+      await mongoSession.withTransaction(async () => {
+        game = new GameTemplate({ ...parsed.data, adminId: req.user.id });
+        await game.save({ session: mongoSession });
+      });
+    } finally {
+      await mongoSession.endSession();
+    }
+  } catch (error) {
+    if (error.message.includes('Transaction numbers are only allowed on a replica set')) {
+      // Standalone MongoDB - save without transaction
       game = new GameTemplate({ ...parsed.data, adminId: req.user.id });
-      await game.save({ session: mongoSession });
-    });
-  } finally {
-    await mongoSession.endSession();
+      await game.save();
+    } else {
+      throw error;
+    }
   }
   return res.status(201).json({ game });
 }));
@@ -134,18 +145,32 @@ router.put('/:id', requireRole('admin'), asyncHandler(async (req, res) => {
     throw new ApiError(400, 'INVALID_GAME_PAYLOAD', 'Invalid game payload', parsed.error.flatten());
   }
 
-  const mongoSession = await mongoose.startSession();
+  // Try transaction, fall back to non-transactional for standalone MongoDB
   let game = null;
   try {
-    await mongoSession.withTransaction(async () => {
+    const mongoSession = await mongoose.startSession();
+    try {
+      await mongoSession.withTransaction(async () => {
+        game = await GameTemplate.findOneAndUpdate(
+          { _id: req.params.id, adminId: req.user.id },
+          { ...parsed.data, status: 'draft' },
+          { new: true, session: mongoSession }
+        );
+      });
+    } finally {
+      await mongoSession.endSession();
+    }
+  } catch (error) {
+    if (error.message.includes('Transaction numbers are only allowed on a replica set')) {
+      // Standalone MongoDB - update without transaction
       game = await GameTemplate.findOneAndUpdate(
         { _id: req.params.id, adminId: req.user.id },
         { ...parsed.data, status: 'draft' },
-        { new: true, session: mongoSession }
+        { new: true }
       );
-    });
-  } finally {
-    await mongoSession.endSession();
+    } else {
+      throw error;
+    }
   }
 
   if (!game) {
@@ -160,11 +185,32 @@ router.post('/:id/publish', requireRole('admin'), asyncHandler(async (req, res) 
     throw new ApiError(400, 'INVALID_GAME_ID', 'Invalid game id');
   }
 
-  const mongoSession = await mongoose.startSession();
+  // Try transaction, fall back to non-transactional for standalone MongoDB
   let game = null;
   try {
-    await mongoSession.withTransaction(async () => {
-      game = await GameTemplate.findOne({ _id: req.params.id, adminId: req.user.id }).session(mongoSession);
+    const mongoSession = await mongoose.startSession();
+    try {
+      await mongoSession.withTransaction(async () => {
+        game = await GameTemplate.findOne({ _id: req.params.id, adminId: req.user.id }).session(mongoSession);
+        if (!game) {
+          throw new ApiError(404, 'GAME_NOT_FOUND', 'Game not found');
+        }
+
+        const result = validatePublishability(game);
+        if (!result.ok) {
+          throw new ApiError(400, 'GAME_NOT_PUBLISHABLE', 'Game is not publishable', result.errors);
+        }
+
+        game.status = 'public';
+        await game.save({ session: mongoSession });
+      });
+    } finally {
+      await mongoSession.endSession();
+    }
+  } catch (error) {
+    if (error.message.includes('Transaction numbers are only allowed on a replica set')) {
+      // Standalone MongoDB - publish without transaction
+      game = await GameTemplate.findOne({ _id: req.params.id, adminId: req.user.id });
       if (!game) {
         throw new ApiError(404, 'GAME_NOT_FOUND', 'Game not found');
       }
@@ -175,10 +221,10 @@ router.post('/:id/publish', requireRole('admin'), asyncHandler(async (req, res) 
       }
 
       game.status = 'public';
-      await game.save({ session: mongoSession });
-    });
-  } finally {
-    await mongoSession.endSession();
+      await game.save();
+    } else {
+      throw error;
+    }
   }
   return res.json({ game });
 }));

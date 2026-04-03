@@ -65,7 +65,7 @@ const gameTemplateSchema = new mongoose.Schema(
 gameTemplateSchema.index({ adminId: 1, status: 1, updatedAt: -1 });
 gameTemplateSchema.index({ status: 1, createdAt: -1 });
 
-gameTemplateSchema.pre('validate', function enforceUniqueSceneIds(next) {
+gameTemplateSchema.pre('validate', function enforceUniqueSceneIds() {
   const seen = new Set();
   for (const scene of this.scenes || []) {
     if (seen.has(scene.sceneId)) {
@@ -74,7 +74,6 @@ gameTemplateSchema.pre('validate', function enforceUniqueSceneIds(next) {
     }
     seen.add(scene.sceneId);
   }
-  next();
 });
 
 export const GameTemplate = mongoose.model('GameTemplate', gameTemplateSchema);
