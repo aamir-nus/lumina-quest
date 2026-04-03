@@ -8,32 +8,21 @@ Turn-based MERN story engine where authored branches stay deterministic and LLMs
 flowchart LR
   A["Admin Authored Graph"] --> B["Scene RenderConfig + Avenue VisualEffects"]
   B --> C["Session Engine"]
-  C --> D["LLM Resolve (openrouter | lmstudio)"]
+  C --> D["LLM Resolve"]
   D --> E["Policy Validation"]
   E --> F["Narration + Visual State Delta"]
-  F --> G["8-bit Stage + Transition Overlay + Ending Grade"]
+  F --> G["Presentation Layer"]
 ```
 
-## New UI Widgets
-- Admin observability panel now shows:
-  - token consumption (`input`, `output`, `total`)
-  - compute/memory approximation (latency, CPU, RSS, heap)
-- Player resolution badge now shows per-action:
-  - token consumption
-  - compute approximation
+## Features
+- **Authored Scene Graph**: Deterministic game branches with server-authoritative turn resolution
+- **LLM Intent Mapping**: Free-form player input mapped to authored routes using configurable providers
+- **Provider Switching**: Support for `openrouter`, `lmstudio`, with extensible adapter pattern
+- **Visual State**: 8-bit styled presentation with layered components, transitions, and endings
+- **Observability**: Token usage tracking, compute metrics, and request tracing
+- **Security**: Cookie-first auth, optimistic concurrency, transaction wrapping, and structured errors
 
-## Iteration Status
-
-```mermaid
-flowchart TD
-  I1["Iteration 1"] --> S1["Stable"]
-  I2["Iteration 2"] --> S2["Stable + Hardened"]
-  I3["Iteration 3"] --> S3["Core Delivered"]
-  S3 --> N1["MLX Adapter Pending"]
-  S3 --> N2["WebGPU Adapter Pending"]
-```
-
-## Run Locally
+## Quick Start
 1. `npm install`
 2. `cp .env.example .env`
 3. Set `JWT_SECRET` (24+ chars)
@@ -65,12 +54,10 @@ docker buildx build --platform linux/arm64 -f server/Dockerfile -t luminaquest-s
 docker buildx build --platform linux/arm64 -f web/Dockerfile -t luminaquest-web:arm64 .
 ```
 
-## Docs
-- [API Overview](/Users/aamirsyedaltaf/Documents/lumina-quest/docs/API.md)
-- [UI Mockups](/Users/aamirsyedaltaf/Documents/lumina-quest/docs/UI_MOCKUPS.md)
-- [Iteration Checklist](/Users/aamirsyedaltaf/Documents/lumina-quest/docs/ITERATION_CHECKLIST.md)
-- [Iteration 3 Execution](/Users/aamirsyedaltaf/Documents/lumina-quest/docs/ITERATION_3_EXECUTION.md)
-- [Iteration 3 Summary](/Users/aamirsyedaltaf/Documents/lumina-quest/docs/ITERATION_3_SUMMARY.md)
-- [Strict Pass Report](/Users/aamirsyedaltaf/Documents/lumina-quest/docs/STRICT_PASS_REPORT.md)
-- [Admin Guide](/Users/aamirsyedaltaf/Documents/lumina-quest/for-admin.md)
-- [User Guide](/Users/aamirsyedaltaf/Documents/lumina-quest/for-user.md)
+## Documentation
+- [API Reference](docs/API.md) - Complete API contract and endpoint documentation
+- [UI Mockups](docs/UI_MOCKUPS.md) - Visual design references
+- [Development Guide](DEVELOPMENT.md) - Setup, architecture, and contribution guidelines
+- [Changelog](CHANGELOG.md) - Project history and notable changes
+- [Admin Guide](for-admin.md) - Administration and observability features
+- [User Guide](for-user.md) - End-user documentation
