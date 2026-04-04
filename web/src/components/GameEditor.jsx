@@ -33,6 +33,7 @@ export function GameEditor({ game, onSave, onCancel }) {
   const [generationError, setGenerationError] = useState(null);
   const [engagementMessage, setEngagementMessage] = useState(null);
   const messageIntervalRef = useRef(null);
+  const updateAvenueRef = useRef(null);
 
   // Carousel state
   const [selectedSceneId, setSelectedSceneId] = useState(null);
@@ -80,7 +81,15 @@ export function GameEditor({ game, onSave, onCancel }) {
 
   const updateMutation = useMutation({
     mutationFn: async (payload) => (await api.put(`/games/${payload._id}`, payload)).data.game,
-    onSuccess: (updatedGame) => onSave(updatedGame)
+    onSuccess: (updatedGame) => {
+      // Update local state with the response from server
+      setEditedGame(updatedGame);
+      // Invalidate queries to ensure fresh data
+      queryClient.invalidateQueries({ queryKey: ['my-games'] });
+      queryClient.invalidateQueries({ queryKey: ['games'] });
+      // Notify parent but don't close editor
+      onSave(updatedGame);
+    }
   });
 
   const generateSceneOptionsMutation = useMutation({
@@ -165,6 +174,9 @@ export function GameEditor({ game, onSave, onCancel }) {
       ))
     }));
   };
+
+  // Keep ref updated for modal callback
+  updateAvenueRef.current = updateAvenue;
 
   const addAvenue = (sceneId) => {
     setEditedGame((prev) => ({
@@ -290,8 +302,8 @@ export function GameEditor({ game, onSave, onCancel }) {
     const scene = editedGame.scenes.find((s) => s.sceneId === selectedSceneId);
     if (!scene) return;
 
-    updateAvenue(selectedSceneId, avenueId, updates);
-  }, [editedGame, selectedSceneId, updateAvenue]);
+    updateAvenueRef.current(selectedSceneId, avenueId, updates);
+  }, [editedGame, selectedSceneId]);
 
   const selectedScene = editedGame.scenes?.find((s) => s.sceneId === selectedSceneId);
 

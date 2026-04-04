@@ -102,7 +102,8 @@ export const AdminPanel = memo(function AdminPanel({ me, onPlaytestSession }) {
       <GameEditor
         game={editingGame}
         onSave={(updatedGame) => {
-          setEditingGame(null);
+          // Update the editor with the saved game instead of closing
+          setEditingGame(updatedGame);
           setSelectedGameId(updatedGame._id);
         }}
         onCancel={() => setEditingGame(null)}
