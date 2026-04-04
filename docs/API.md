@@ -1,8 +1,8 @@
-# API Documentation (v1)
+# API Documentation
 
 **Base URL:** `http://localhost:4000/api`
 
-**Version:** Iteration 3 - LLM Integration Complete
+**Version:** v2 - Guided-Graph Authoring & Carousel UI
 
 ---
 
@@ -10,6 +10,7 @@
 
 - [Authentication](#authentication)
 - [Games](#games)
+- [Game Generation (v2)](#game-generation-v2)
 - [Sessions](#sessions)
 - [LLM Integration](#llm-integration)
 - [Admin](#admin)
@@ -75,45 +76,51 @@ All endpoints except registration/login require authentication via:
 
 ### Game Schema
 
+The API supports both v1 (legacy) and v2 (guided-graph) game structures. V2 games include additional metadata for AI-assisted authoring and bounded narrative flow.
+
+#### V2 Game Structure
+
 ```json
 {
+  "schemaVersion": 2,
   "title": "The Crystal Cave",
   "description": "An adventure game",
-  "constraints": {
-    "maxTurns": 100,
-    "targetPoints": 50
+  "status": "draft",
+  "storyConfig": {
+    "premise": "A mysterious cave system holds ancient secrets.",
+    "startGoal": "Enter the cave and explore its depths",
+    "endGoal": "Find the legendary crystal treasure",
+    "tone": "cinematic",
+    "difficulty": "medium"
   },
-  "wildcardConfig": {
-    "enabled": false,
-    "recoverySceneId": "",
-    "highRewardPoints": 2,
-    "lowRewardPoints": 0
+  "generationState": {
+    "status": "complete",
+    "pendingSceneIds": []
   },
-  "startSceneId": "entrance",
+  "startSceneId": "scene_01",
   "scenes": [
     {
-      "sceneId": "entrance",
-      "narrative": "You stand at the entrance...",
-      "imageKey": "",
-      "isTerminal": false,
-      "renderConfig": {
-        "theme": "pastel",
-        "backgroundLayers": [],
-        "foregroundLayers": [],
-        "sprite": {
-          "id": "hero",
-          "mood": "neutral",
-          "x": 0.5,
-          "y": 0.82
-        }
+      "sceneId": "scene_01",
+      "kind": "story",
+      "stepIndex": 0,
+      "goalSummary": "Enter the cave entrance",
+      "narrative": "You stand at the entrance of a mysterious cave...",
+      "inputPolicy": {
+        "allowFreeform": true,
+        "invalidAttemptLimit": 3,
+        "invalidPenalty": -1
       },
       "avenues": [
         {
-          "avenueId": "enter_cave",
-          "label": "Enter the cave",
-          "keywords": ["enter", "go", "in", "cave"],
+          "avenueId": "scene_01_ai_1",
+          "label": "Step cautiously into the darkness",
+          "intent": "cautious_approach",
+          "outcome": "partial",
+          "scoreImpact": 1,
           "points": 1,
-          "nextSceneId": "chamber",
+          "keywords": ["enter", "step", "cautious", "darkness"],
+          "nextSceneId": "scene_02",
+          "origin": "ai_generated",
           "visualEffects": {
             "transition": "fade",
             "spriteMood": "",
@@ -123,9 +130,57 @@ All endpoints except registration/login require authentication via:
           }
         }
       ]
+    },
+    {
+      "sceneId": "ending_win",
+      "kind": "ending",
+      "endingType": "win",
+      "goalSummary": "Victory! You found the crystal",
+      "narrative": "The crystal glows brilliantly in your hands...",
+      "avenues": []
     }
   ]
 }
+```
+
+#### V2 Schema Fields
+
+**Top-Level Fields:**
+- `schemaVersion` (number): Version identifier (2 for v2 games)
+- `status` (string): `"draft"` | `"published"`
+- `storyConfig` (object): Story metadata and generation settings
+- `generationState` (object): AI generation tracking
+
+**StoryConfig:**
+- `premise` (string): Story premise for AI generation
+- `startGoal` (string): Initial player objective
+- `endGoal` (string): Final victory condition
+- `tone` (string): Narrative tone (`"cinematic"` | `"plain"` | `"dramatic"`)
+- `difficulty` (string): Game difficulty (`"easy"` | `"medium"` | `"hard"`)
+
+**GenerationState:**
+- `status` (string): `"complete"` | `"partial"` | `"manual_required"`
+- `pendingSceneIds` (string[]): Scenes awaiting option generation
+
+**Scene Fields (V2):**
+- `kind` (string): Scene type (`"story"` | `"ending"`)
+- `stepIndex` (number): Sequential position in story (0-based)
+- `goalSummary` (string): Brief description of scene's objective
+- `inputPolicy` (object): Input validation and penalty rules
+- `endingType` (string): For endings only (`"win"` | `"fail"`)
+
+**Avenue Fields (V2):**
+- `intent` (string): Categorical intent identifier for classification
+- `outcome` (string): Outcome type (`"success"` | `"partial"` | `"fail"`)
+- `scoreImpact` (number): Points awarded (preferred field; `points` is alias)
+- `origin` (string): Creation method (`"ai_generated"` | `"manual"`)
+
+#### V1 Legacy Support
+
+Legacy v1 games remain fully playable. The runtime normalizes v1 games to the v2 structure automatically. V1 games use:
+- `isTerminal` instead of `kind` and `endingType`
+- `renderConfig` instead of `visualEffects`
+- No `storyConfig` or `generationState`
 ```
 
 ### Create Game Response
@@ -142,6 +197,238 @@ All endpoints except registration/login require authentication via:
   }
 }
 ```
+
+---
+
+## Game Generation (v2)
+
+V2 provides AI-assisted game authoring with guided narrative flow. These endpoints use LMStudio (or configured LLM provider) to generate story beats and player options.
+
+### Endpoints
+
+| Method   | Endpoint                                        | Description                            | Auth  |
+| -------- | ----------------------------------------------- | -------------------------------------- | ----- |
+| `POST` | `/games/generate-flow`                         | Create new v2 game with beats/endings  | Admin |
+| `POST` | `/games/:id/regenerate-flow`                   | Regenerate entire story flow           | Admin |
+| `POST` | `/games/:id/generate-options`                  | Generate options for pending scenes    | Admin |
+| `POST` | `/games/:id/scenes/:sceneId/generate-options`  | Regenerate options for one scene       | Admin |
+
+### Generate Flow
+
+Creates a new v2 game draft with AI-generated story beats and ending scenes.
+
+**Request:**
+
+```json
+{
+  "title": "The Crystal Cave",
+  "description": "An adventure through a mysterious cave system",
+  "storyConfig": {
+    "premise": "A mysterious cave system holds ancient secrets and treasures.",
+    "startGoal": "Enter the cave and explore its depths",
+    "endGoal": "Find the legendary crystal treasure",
+    "tone": "cinematic",
+    "difficulty": "medium"
+  }
+}
+```
+
+**Response:**
+
+```json
+{
+  "game": {
+    "_id": "game-id",
+    "schemaVersion": 2,
+    "title": "The Crystal Cave",
+    "status": "draft",
+    "storyConfig": {
+      "premise": "A mysterious cave system holds ancient secrets and treasures.",
+      "startGoal": "Enter the cave and explore its depths",
+      "endGoal": "Find the legendary crystal treasure",
+      "tone": "cinematic",
+      "difficulty": "medium"
+    },
+    "generationState": {
+      "status": "partial",
+      "pendingSceneIds": ["scene_01", "scene_02", "scene_03"]
+    },
+    "startSceneId": "scene_01",
+    "scenes": [
+      {
+        "sceneId": "scene_01",
+        "kind": "story",
+        "stepIndex": 0,
+        "goalSummary": "Enter the cave entrance",
+        "narrative": "You stand at the entrance of a mysterious cave...",
+        "inputPolicy": {
+          "allowFreeform": true,
+          "invalidAttemptLimit": 3,
+          "invalidPenalty": -1
+        },
+        "avenues": []
+      },
+      {
+        "sceneId": "ending_win",
+        "kind": "ending",
+        "endingType": "win",
+        "goalSummary": "Victory! You found the crystal",
+        "narrative": "The crystal glows brilliantly in your hands...",
+        "avenues": []
+      }
+    ]
+  }
+}
+```
+
+**Behavior:**
+- Generates 3-6 story beats based on difficulty
+- Creates win and fail ending scenes
+- Scenes have no `avenues` initially (use `/generate-options` next)
+- Falls back to manual template if LLM times out or fails
+
+### Generate Options
+
+Generates player options (avenues) for all pending scenes in one batch.
+
+**Request:**
+
+```bash
+POST /api/games/game-id/generate-options
+```
+
+**Response:**
+
+```json
+{
+  "game": {
+    "_id": "game-id",
+    "generationState": {
+      "status": "complete",
+      "pendingSceneIds": []
+    },
+    "scenes": [
+      {
+        "sceneId": "scene_01",
+        "avenues": [
+          {
+            "avenueId": "scene_01_ai_1",
+            "label": "Step cautiously into the darkness",
+            "intent": "cautious_approach",
+            "outcome": "partial",
+            "scoreImpact": 1,
+            "points": 1,
+            "keywords": ["enter", "step", "cautious", "darkness"],
+            "nextSceneId": "scene_02",
+            "origin": "ai_generated"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**Behavior:**
+- Generates 2-6 options per scene based on difficulty
+- `origin` is set to `"ai_generated"` for AI-created options
+- Partial generation is acceptable (some scenes may remain pending)
+- Sets `generationState.status` to `"complete"` or `"manual_required"`
+
+### Generate Options (Single Scene)
+
+Regenerates options for a specific scene only.
+
+**Request:**
+
+```bash
+POST /api/games/game-id/scenes/scene_02/generate-options
+```
+
+**Response:**
+
+```json
+{
+  "game": {
+    "scenes": [
+      {
+        "sceneId": "scene_02",
+        "avenues": [
+          {
+            "avenueId": "scene_02_ai_1",
+            "label": "Examine the glowing crystals",
+            "intent": "investigate_crystals",
+            "outcome": "success",
+            "scoreImpact": 2,
+            "points": 2,
+            "origin": "ai_generated"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**Use Cases:**
+- Re-roll options for a specific scene
+- Replace manually-authored options with AI suggestions
+- Add more options to a scene (up to 5 total)
+
+### Regenerate Flow
+
+Completely regenerates the story beat structure while preserving the story config.
+
+**Request:**
+
+```bash
+POST /api/games/game-id/regenerate-flow
+```
+
+**Response:** Same as `/generate-flow`
+
+**Use Cases:**
+- Author is unsatisfied with the beat structure
+- Want to try a different narrative flow
+- Previous generation was incomplete or had errors
+
+### Expected Option Counts
+
+The API enforces option counts based on difficulty:
+
+| Difficulty | Min Options | Max Options |
+| ---------- | ----------- | ----------- |
+| `easy`     | 2           | 3           |
+| `medium`   | 3           | 5           |
+| `hard`     | 4           | 6           |
+
+**Validation:**
+- Carousel UI enforces max 5 options per scene
+- Backend validates during save
+- Generation services target these ranges
+
+### Fallback Behavior
+
+When LMStudio is unavailable or times out:
+
+**Flow Generation:**
+- Returns a basic template with 3 story beats
+- Sets `generationState.status = "manual_required"`
+- Admin can manually edit scene narratives and goals
+
+**Option Generation:**
+- Returns empty `avenues` array for pending scenes
+- Sets `generationState.status = "manual_required"`
+- Admin must manually add options via carousel UI
+
+### Logging Prefixes
+
+Watch for these in server logs during generation:
+
+- `[FLOW_GEN]` - Story flow generation
+- `[OPTION_GEN]` - Option generation
+- `[TEMPLATE_V2]` - Template validation
+- `[LLM_CLASSIFY]` - LLM classification calls
 
 ---
 
