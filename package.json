@@ -12,7 +12,13 @@
     "dev:server": "npm run dev -w server",
     "dev:web": "npm run dev -w web",
     "build": "npm run build -w web",
+    "test:server": "npm run test -w server",
     "start": "npm run start -w server",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "docker:build": "docker compose build",
+    "docker:test": "docker compose up -d --build && RUN_SMOKE_TESTS=true docker compose logs -f server",
     "mongo:up": "docker compose up -d mongo",
     "mongo:down": "docker compose stop mongo",
     "mongo:logs": "docker compose logs -f mongo"

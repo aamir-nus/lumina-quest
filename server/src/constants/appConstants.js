@@ -1,0 +1,15 @@
+export const AUTH = {
+  BCRYPT_SALT_ROUNDS: 10,
+  JWT_EXPIRES_IN: '7d'
+};
+
+export const HTTP = {
+  JSON_LIMIT: '256kb'
+};
+
+export const GAME = {
+  TURN_SEARCH_BUFFER: 3,
+  MAX_WILDCARD_HIGH_POINTS: 5,
+  MAX_WILDCARD_LOW_POINTS: 2,
+  MIN_WILDCARD_LOW_POINTS: -2
+};

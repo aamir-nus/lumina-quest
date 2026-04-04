@@ -1,0 +1,237 @@
+.resolutionBadge {
+  margin: 10px 0;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  padding: 10px;
+  animation: fadeSlide 260ms ease;
+}
+
+.resolutionBadge.avenue {
+  background: rgba(63, 143, 123, 0.15);
+}
+
+.resolutionBadge.wildcard {
+  background: rgba(204, 111, 77, 0.16);
+}
+
+.resolutionBadge.clarification {
+  background: rgba(124, 117, 84, 0.16);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.auth-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.auth-header {
+  text-align: center;
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.auth-row {
+  justify-content: center;
+  width: 100%;
+}
+
+.chipBtn {
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  background: #f8e7da;
+}
+
+.graphCanvas {
+  width: 100%;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.graphNode {
+  fill: #f3d8cb;
+  stroke: #b7694b;
+  stroke-width: 1;
+}
+
+.graphNodeText,
+.graphTargetText {
+  font-size: 9px;
+  fill: #1f2f38;
+}
+
+.graphEdge {
+  stroke: #4b8d78;
+  stroke-width: 1.2;
+}
+
+.gameStage {
+  margin-top: 8px;
+  border: 2px solid #9b6f62;
+  border-radius: 8px;
+  padding: 8px;
+  image-rendering: pixelated;
+}
+
+.stageLayers {
+  min-height: 130px;
+  border: 2px dashed rgba(31, 47, 56, 0.3);
+  padding: 8px;
+  display: grid;
+  gap: 4px;
+}
+
+.layerTile {
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  border: 1px solid rgba(31, 47, 56, 0.4);
+  padding: 3px 6px;
+}
+
+.layerTile.off {
+  opacity: 0.35;
+}
+
+.layerTile.bg {
+  background: rgba(132, 193, 172, 0.22);
+}
+
+.layerTile.fg {
+  background: rgba(209, 128, 82, 0.24);
+}
+
+.sprite {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  border: 2px solid rgba(31, 47, 56, 0.55);
+  background: #fff6e6;
+  font-family: 'Courier New', monospace;
+  padding: 4px 8px;
+}
+
+.sprite[data-mood='heroic'] {
+  border-color: #3f8f7b;
+}
+
+.sprite[data-mood='greedy'] {
+  border-color: #bf5630;
+}
+
+.sprite[data-mood='focused'] {
+  border-color: #456da8;
+}
+
+.theme-pastel {
+  background: linear-gradient(180deg, #f6eee6, #f4f6ee);
+}
+
+.theme-night {
+  background: linear-gradient(180deg, #2f3e63, #4b6f88);
+  color: #ecf2ff;
+}
+
+.theme-sunrise {
+  background: linear-gradient(180deg, #fdd9b9, #fbeec5);
+}
+
+.theme-victory {
+  background: linear-gradient(180deg, #d6f5d8, #f4ffd9);
+}
+
+.theme-crimson {
+  background: linear-gradient(180deg, #7f2b35, #b23e4e);
+  color: #fff2f0;
+}
+
+.transitionOverlay {
+  margin-top: 8px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.transitionOverlay.fade {
+  background: rgba(31, 47, 56, 0.12);
+}
+
+.transitionOverlay.scanline {
+  background: repeating-linear-gradient(180deg, rgba(69, 109, 168, 0.22), rgba(69, 109, 168, 0.22) 3px, transparent 3px, transparent 6px);
+}
+
+.transitionOverlay.arcade-flash {
+  background: linear-gradient(90deg, rgba(63, 143, 123, 0.32), rgba(255, 245, 161, 0.46));
+}
+
+.transitionOverlay.glitch {
+  background: linear-gradient(90deg, rgba(178, 62, 78, 0.36), rgba(77, 132, 176, 0.28));
+}
+
+.endingPanel {
+  margin-top: 10px;
+  border: 2px solid rgba(31, 47, 56, 0.44);
+  border-radius: 10px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.metricsWidget {
+  margin-top: 8px;
+  border: 1px solid rgba(31, 47, 56, 0.25);
+  border-radius: 8px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.metricsWidget h4 {
+  margin: 0 0 4px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.metricsWidget.compact {
+  margin-top: 6px;
+  padding: 6px;
+}
+
+.animatedScene {
+  animation: fadeSlide 280ms ease;
+}
+
+@keyframes fadeSlide {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.delete-btn {
+  background: linear-gradient(180deg, #e8b4b4, #d49a9a);
+  color: #7f2b2b;
+  border-color: #c47f7f;
+}
+
+.delete-btn:hover:not(:disabled) {
+  background: linear-gradient(180deg, #d49a9a, #c47f7f);
+  filter: saturate(120%);
+}
+
+.delete-btn:disabled {
+  opacity: 0.5;
+}

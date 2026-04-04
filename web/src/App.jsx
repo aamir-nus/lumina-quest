@@ -1,282 +1,118 @@
-import { useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, setAuthToken } from './api';
-
-const starterGame = {
-  title: 'The Gate of Emberfall',
-  description: 'A compact 3-scene journey to validate the story engine.',
-  constraints: { maxTurns: 4, targetPoints: 3 },
-  startSceneId: 'scene_start',
-  scenes: [
-    {
-      sceneId: 'scene_start',
-      narrative: 'You arrive at Emberfall gate. A wary guard blocks the entrance.',
-      isTerminal: false,
-      imageKey: 'gate',
-      avenues: [
-        {
-          avenueId: 'a_talk',
-          label: 'Reason with the guard',
-          keywords: ['talk', 'reason', 'convince'],
-          points: 2,
-          nextSceneId: 'scene_square'
-        },
-        {
-          avenueId: 'a_sneak',
-          label: 'Sneak through side alley',
-          keywords: ['sneak', 'stealth', 'alley'],
-          points: 1,
-          nextSceneId: 'scene_square'
-        }
-      ]
-    },
-    {
-      sceneId: 'scene_square',
-      narrative: 'Inside the square, you spot a relic chest and hear alarm bells.',
-      isTerminal: false,
-      imageKey: 'square',
-      avenues: [
-        {
-          avenueId: 'a_help',
-          label: 'Help civilians first',
-          keywords: ['help', 'save', 'protect'],
-          points: 2,
-          nextSceneId: 'scene_end'
-        },
-        {
-          avenueId: 'a_loot',
-          label: 'Rush for the relic chest',
-          keywords: ['loot', 'chest', 'relic'],
-          points: -1,
-          nextSceneId: 'scene_end'
-        }
-      ]
-    },
-    {
-      sceneId: 'scene_end',
-      narrative: 'The town records your actions. Dawn breaks over Emberfall.',
-      isTerminal: true,
-      imageKey: 'dawn',
-      avenues: []
-    }
-  ]
-};
-
-function AuthPanel({ onAuth }) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('password123');
-  const [role, setRole] = useState('user');
-  const [mode, setMode] = useState('login');
-
-  const mutation = useMutation({
-    mutationFn: async () => {
-      const path = mode === 'login' ? '/auth/login' : '/auth/register';
-      const payload = mode === 'register' ? { email, password, role } : { email, password };
-      const { data } = await api.post(path, payload);
-      return data;
-    },
-    onSuccess: (data) => onAuth(data)
-  });
-
-  return (
-    <section className="card">
-      <h2>Auth</h2>
-      <p className="muted">Create an admin and a user account to test both journeys.</p>
-      <div className="row">
-        <button className={mode === 'login' ? 'active' : ''} onClick={() => setMode('login')}>Login</button>
-        <button className={mode === 'register' ? 'active' : ''} onClick={() => setMode('register')}>Register</button>
-      </div>
-      <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email" />
-      <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="password" type="password" />
-      {mode === 'register' ? (
-        <select value={role} onChange={(e) => setRole(e.target.value)}>
-          <option value="admin">admin</option>
-          <option value="user">user</option>
-        </select>
-      ) : null}
-      <button onClick={() => mutation.mutate()} disabled={mutation.isPending || !email}>
-        {mutation.isPending ? 'Processing...' : mode}
-      </button>
-      {mutation.error ? <p className="error">{mutation.error.response?.data?.error || 'Auth failed'}</p> : null}
-    </section>
-  );
-}
-
-function AdminPanel({ me }) {
-  const queryClient = useQueryClient();
-  const myGames = useQuery({
-    queryKey: ['my-games'],
-    queryFn: async () => (await api.get('/games/mine')).data.games,
-    enabled: me?.role === 'admin'
-  });
-
-  const createMutation = useMutation({
-    mutationFn: async () => (await api.post('/games', starterGame)).data.game,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['my-games'] })
-  });
-
-  const publishMutation = useMutation({
-    mutationFn: async (gameId) => (await api.post(`/games/${gameId}/publish`)).data.game,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['my-games'] })
-  });
-
-  if (me?.role !== 'admin') {
-    return (
-      <section className="card">
-        <h2>Admin Forge</h2>
-        <p className="muted">Login as an admin to create and publish stories.</p>
-      </section>
-    );
-  }
-
-  return (
-    <section className="card">
-      <h2>Admin Forge</h2>
-      <button onClick={() => createMutation.mutate()} disabled={createMutation.isPending}>
-        {createMutation.isPending ? 'Creating...' : 'Create starter game'}
-      </button>
-      <div className="list">
-        {(myGames.data || []).map((game) => (
-          <div key={game._id} className="listItem">
-            <div>
-              <strong>{game.title}</strong>
-              <p className="muted">{game.status} | scenes: {game.scenes.length}</p>
-            </div>
-            <button onClick={() => publishMutation.mutate(game._id)} disabled={publishMutation.isPending || game.status === 'public'}>
-              {game.status === 'public' ? 'Published' : 'Publish'}
-            </button>
-          </div>
-        ))}
-      </div>
-      {publishMutation.error ? <p className="error">{publishMutation.error.response?.data?.details?.join(', ') || 'Publish failed'}</p> : null}
-    </section>
-  );
-}
-
-function PlayerPanel({ me }) {
-  const [sessionId, setSessionId] = useState('');
-  const [input, setInput] = useState('');
-  const queryClient = useQueryClient();
-
-  const publicGames = useQuery({
-    queryKey: ['public-games'],
-    queryFn: async () => (await api.get('/games/public')).data.games
-  });
-
-  const sessionQuery = useQuery({
-    queryKey: ['session', sessionId],
-    queryFn: async () => (await api.get(`/sessions/${sessionId}`)).data,
-    enabled: !!sessionId
-  });
-
-  const startMutation = useMutation({
-    mutationFn: async (gameId) => (await api.post('/sessions/start', { gameId })).data.session,
-    onSuccess: (session) => setSessionId(session._id)
-  });
-
-  const actionMutation = useMutation({
-    mutationFn: async () => (await api.post('/sessions/action', { sessionId, userInput: input })).data,
-    onSuccess: (data) => {
-      setInput('');
-      queryClient.setQueryData(['session', sessionId], (old) => ({
-        ...(old || {}),
-        session: data.session,
-        currentScene: data.currentScene || old?.currentScene,
-        game: old?.game
-      }));
-    }
-  });
-
-  const scene = sessionQuery.data?.currentScene;
-  const session = sessionQuery.data?.session;
-  const game = sessionQuery.data?.game;
-
-  return (
-    <section className="card">
-      <h2>Player Journey</h2>
-      <p className="muted">Signed in as: {me?.email || 'guest'} ({me?.role || 'n/a'})</p>
-
-      <div className="list">
-        {(publicGames.data || []).map((gameItem) => (
-          <div key={gameItem._id} className="listItem">
-            <div>
-              <strong>{gameItem.title}</strong>
-              <p className="muted">target: {gameItem.constraints.targetPoints} | turns: {gameItem.constraints.maxTurns}</p>
-            </div>
-            <button onClick={() => startMutation.mutate(gameItem._id)} disabled={!me || startMutation.isPending}>
-              Start
-            </button>
-          </div>
-        ))}
-      </div>
-
-      {session ? (
-        <>
-          <div className="hud">
-            <span>Points: {session.stats.points}</span>
-            <span>Turns: {session.stats.turnsUsed}/{game.constraints.maxTurns}</span>
-            <span>Status: {session.status}</span>
-          </div>
-          <div className="scene">
-            <h3>{scene?.sceneId}</h3>
-            <p>{scene?.narrative}</p>
-          </div>
-          <div className="row">
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Describe your action"
-              disabled={session.status !== 'active'}
-            />
-            <button onClick={() => actionMutation.mutate()} disabled={!input || actionMutation.isPending || session.status !== 'active'}>
-              {actionMutation.isPending ? 'Resolving...' : 'Send'}
-            </button>
-          </div>
-          <div className="history">
-            {(session.history || []).slice().reverse().map((item) => (
-              <div key={`${item.turn}-${item.sceneId}`} className="historyItem">
-                <strong>Turn {item.turn}</strong>
-                <p>{item.userQuery}</p>
-                <p className="muted">{item.resolvedAvenueId} | Δ {item.pointsDelta}</p>
-              </div>
-            ))}
-          </div>
-        </>
-      ) : null}
-    </section>
-  );
-}
+import { useEffect, useMemo, useState } from 'react';
+import { api } from './api';
+import { AuthPanel } from './components/AuthPanel';
+import { AdminPanel } from './components/AdminPanel';
+import { PlayerPanel } from './components/PlayerPanel';
 
 export default function App() {
-  const [auth, setAuth] = useState(() => {
-    const raw = localStorage.getItem('luminaquest.auth');
-    return raw ? JSON.parse(raw) : null;
-  });
+  const [auth, setAuth] = useState(null);
+  const [playtestSessionId, setPlaytestSessionId] = useState('');
+  const [adminTab, setAdminTab] = useState('player-forge'); // 'player-forge' | 'user-journey'
 
   const me = useMemo(() => auth?.user || null, [auth]);
-  setAuthToken(auth?.token || '');
+
+  useEffect(() => {
+    let active = true;
+    api.get('/auth/me')
+      .then((res) => {
+        if (active) setAuth({ user: res.data.user });
+      })
+      .catch(() => {
+        if (active) setAuth(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const onAuth = (nextAuth) => {
-    localStorage.setItem('luminaquest.auth', JSON.stringify(nextAuth));
-    setAuth(nextAuth);
+    setAuth({ user: nextAuth.user });
   };
 
   const logout = () => {
-    localStorage.removeItem('luminaquest.auth');
+    api.post('/auth/logout').catch(() => {});
     setAuth(null);
-    setAuthToken('');
+    setAdminTab('player-forge');
   };
 
+  // Not authenticated - show login screen
+  if (!me) {
+    return (
+      <main className="login-screen">
+        <header className="logo-header">
+          <h1 className="pixel-title">
+            <span className="pixel-char" data-hover-delay="0">L</span>
+            <span className="pixel-char" data-hover-delay="40">u</span>
+            <span className="pixel-char" data-hover-delay="80">m</span>
+            <span className="pixel-char" data-hover-delay="120">i</span>
+            <span className="pixel-char" data-hover-delay="160">n</span>
+            <span className="pixel-char" data-hover-delay="200">a</span>
+            <span className="pixel-char spacer" data-hover-delay="0">&nbsp;</span>
+            <span className="pixel-char" data-hover-delay="240">Q</span>
+            <span className="pixel-char" data-hover-delay="280">u</span>
+            <span className="pixel-char" data-hover-delay="320">e</span>
+            <span className="pixel-char" data-hover-delay="360">s</span>
+            <span className="pixel-char" data-hover-delay="400">t</span>
+            <span className="sparkle">✨</span>
+            <span className="pixel-beta">[beta]</span>
+          </h1>
+          <p className="pixel-subtitle">Adventure Awaits</p>
+        </header>
+        <div className="auth-container">
+          <AuthPanel onAuth={onAuth} />
+        </div>
+      </main>
+    );
+  }
+
+  // Authenticated user view
   return (
     <main>
       <header>
-        <h1>LuminaQuest Iteration 1</h1>
-        {me ? <button onClick={logout}>Logout</button> : null}
+        <div className="header-left">
+          <h1 className="compact-title">LuminaQuest <span className="beta-badge">[beta]</span></h1>
+        </div>
+        <div className="header-right">
+          {me?.role === 'admin' && (
+            <div className="admin-tabs">
+              <button
+                type="button"
+                className={adminTab === 'player-forge' ? 'active' : ''}
+                onClick={() => setAdminTab('player-forge')}
+                aria-pressed={adminTab === 'player-forge'}
+              >
+                Player Forge
+              </button>
+              <button
+                type="button"
+                className={adminTab === 'user-journey' ? 'active' : ''}
+                onClick={() => setAdminTab('user-journey')}
+                aria-pressed={adminTab === 'user-journey'}
+              >
+                User Journey
+              </button>
+            </div>
+          )}
+          <span className="user-badge">{me.email}</span>
+          <button onClick={logout}>Logout</button>
+        </div>
       </header>
+
       <div className="grid">
-        <AuthPanel onAuth={onAuth} />
-        <AdminPanel me={me} />
-        <PlayerPanel me={me} />
+        {me?.role === 'admin' ? (
+          // Admin view with tabs
+          <>
+            {adminTab === 'player-forge' && (
+              <AdminPanel me={me} onPlaytestSession={setPlaytestSessionId} />
+            )}
+            {adminTab === 'user-journey' && (
+              <PlayerPanel me={me} externalSessionId={playtestSessionId} />
+            )}
+          </>
+        ) : (
+          // Regular user view - just player journey
+          <PlayerPanel me={me} externalSessionId={playtestSessionId} />
+        )}
       </div>
     </main>
   );

@@ -1,0 +1,5 @@
+# Test scripts (development only)
+test-*.js
+
+# Keep the actual test directory
+!test/

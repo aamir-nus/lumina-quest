@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { env } from './env.js';
+import { logger } from '../utils/logger.js';
 
 const READY_STATE = {
   0: 'disconnected',
@@ -12,6 +13,25 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+let eventsBound = false;
+
+function bindConnectionEvents() {
+  if (eventsBound) return;
+  eventsBound = true;
+  mongoose.connection.on('connected', () => {
+    logger.info('Mongo connected');
+  });
+  mongoose.connection.on('disconnected', () => {
+    logger.warn('Mongo disconnected');
+  });
+  mongoose.connection.on('reconnected', () => {
+    logger.info('Mongo reconnected');
+  });
+  mongoose.connection.on('error', (error) => {
+    logger.error('Mongo connection error', { message: error.message });
+  });
+}
+
 export function getDbStatus() {
   return {
     state: READY_STATE[mongoose.connection.readyState] || 'unknown',
@@ -20,6 +40,7 @@ export function getDbStatus() {
 }
 
 export async function connectMongoWithRetry() {
+  bindConnectionEvents();
   let attempt = 0;
   let lastError = null;
 
@@ -32,9 +53,11 @@ export async function connectMongoWithRetry() {
       return;
     } catch (error) {
       lastError = error;
-      console.error(
-        `[db] Mongo connect failed (attempt ${attempt}/${env.mongoConnectRetries}): ${error.message}`
-      );
+      logger.warn('Mongo connect failed', {
+        attempt,
+        retries: env.mongoConnectRetries,
+        message: error.message
+      });
       if (attempt < env.mongoConnectRetries) {
         await sleep(env.mongoConnectRetryDelayMs);
       }
