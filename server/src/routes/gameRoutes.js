@@ -6,6 +6,7 @@ import { GameTemplate } from '../models/GameTemplate.js';
 import { validatePublishability } from '../utils/validateGameTemplate.js';
 import { ApiError } from '../errors/ApiError.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
+import { generateGameFromStory } from '../services/gameGeneratorService.js';
 
 const router = express.Router();
 
@@ -178,6 +179,48 @@ router.put('/:id', requireRole('admin'), asyncHandler(async (req, res) => {
   }
 
   return res.json({ game });
+}));
+
+router.post('/generate', requireRole('admin'), asyncHandler(async (req, res) => {
+  const generateSchema = z.object({
+    title: z.string().min(1).max(100),
+    description: z.string().max(500).optional(),
+    story: z.string().min(10).max(2000)
+  });
+
+  const parsed = generateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    throw new ApiError(400, 'INVALID_GENERATE_PAYLOAD', 'Invalid generate payload', parsed.error.flatten());
+  }
+
+  const result = await generateGameFromStory(parsed.data);
+
+  if (!result.success) {
+    throw new ApiError(500, 'GENERATION_FAILED', result.error || 'Failed to generate game');
+  }
+
+  // Save generated game as draft
+  let game;
+  try {
+    const mongoSession = await mongoose.startSession();
+    try {
+      await mongoSession.withTransaction(async () => {
+        game = new GameTemplate({ ...result.game, adminId: req.user.id, status: 'draft' });
+        await game.save({ session: mongoSession });
+      });
+    } finally {
+      await mongoSession.endSession();
+    }
+  } catch (error) {
+    if (error.message.includes('Transaction numbers are only allowed on a replica set')) {
+      game = new GameTemplate({ ...result.game, adminId: req.user.id, status: 'draft' });
+      await game.save();
+    } else {
+      throw error;
+    }
+  }
+
+  return res.status(201).json({ game });
 }));
 
 router.post('/:id/publish', requireRole('admin'), asyncHandler(async (req, res) => {

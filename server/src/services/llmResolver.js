@@ -297,6 +297,115 @@ export async function classifyRoute({ gameTitle, sceneNarrative, input, avenues,
 }
 
 /**
+ * Generate wizard dialogue for game ending based on player performance.
+ */
+export async function generateWizardDialogue({ gameTitle, grade, points, targetPoints, turnsUsed, maxTurns, status, choices }) {
+  console.log('[LLM_WIZARD] 🧙 Generating ending dialogue...');
+  console.log(`[LLM_WIZARD] 📊 Grade: ${grade} | Points: ${points}/${targetPoints} | Status: ${status}`);
+
+  const { provider, client } = createClient();
+  const fallbackDialogues = {
+    S: 'Magnificent! Your brilliance shines like a thousand stars! You are a true legend!',
+    A: 'Well done, brave adventurer! Your skills are most impressive!',
+    B: 'A respectable journey! You have proven yourself worthy.',
+    C: 'You survived... barely. Perhaps with more wisdom, next time will be better.',
+    D: 'Ahem. Perhaps adventuring is not your calling? Have you considered... farming?'
+  };
+
+  if (!provider.hasApiKey) {
+    console.log('[LLM_WIZARD] ⚠️ No API key - using fallback');
+    recordMockResponse();
+    recordLlmUsage({ inputTokens: 0, outputTokens: 0, totalTokens: 0 });
+    return {
+      dialogue: fallbackDialogues[grade] || fallbackDialogues.C,
+      provider: provider.provider,
+      usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+      computeApprox: null,
+      providerResponse: mockResponse({ dialogue: fallbackDialogues[grade] || fallbackDialogues.C, reason: 'mock_no_api_key' })
+    };
+  }
+
+  // Format choices for the prompt
+  const choicesSummary = choices.map((c, i) => `${i + 1}. "${c.userQuery}" → ${c.resolvedAvenueId || 'wildcard'} (${c.pointsDelta >= 0 ? '+' : ''}${c.pointsDelta} pts)`).join('\n');
+
+  const tone = grade === 'S' || grade === 'A' ? 'praising and enthusiastic' :
+               grade === 'B' ? 'respectful and encouraging' :
+               grade === 'C' ? 'sympathetic but constructive' :
+               'teasing and humorous (suggesting a different career)';
+
+  const prompt = [
+    `You are an 8-bit wizard NPC giving ending dialogue to a player who just completed a text adventure game.`,
+    '',
+    `Game: ${gameTitle}`,
+    `Player Performance:`,
+    `- Grade: ${grade}`,
+    `- Points: ${points} / Target: ${targetPoints}`,
+    `- Turns: ${turnsUsed} / Max: ${maxTurns}`,
+    `- Result: ${status}`,
+    '',
+    `Player Choices:\n${choicesSummary || 'No choices recorded'}`,
+    '',
+    `Tone: ${tone}`,
+    '',
+    `Generate a SHORT, witty 1-2 sentence response (max 30 words) that:`,
+    `- Matches the tone for their grade`,
+    `- References their performance in a clever way`,
+    `- Stays in character as an 8-bit wizard`,
+    `- Is memorable and fun`,
+    '',
+    `Return strict JSON only: {"dialogue":"short response"}`
+  ].join('\n');
+
+  try {
+    console.log('[LLM_WIZARD] 🔄 Calling LLM provider...');
+    const computeStart = captureComputeStart();
+    const response = await client.responses.create({
+      model: provider.model,
+      input: [
+        {
+          role: 'system',
+          content: [{ type: 'input_text', text: 'You are a witty 8-bit wizard NPC who gives memorable ending dialogues based on player performance.' }]
+        },
+        {
+          role: 'user',
+          content: [{ type: 'input_text', text: prompt }]
+        }
+      ]
+    });
+
+    console.log('[LLM_WIZARD] ✅ Got LLM response, parsing...');
+    const parsed = parseOutput(response, { dialogue: fallbackDialogues[grade] || fallbackDialogues.C });
+    const usage = parseUsage(response);
+    const computeApprox = captureComputeEnd(provider.provider, computeStart);
+    recordLlmUsage(usage);
+
+    console.log(`[LLM_WIZARD] 📖 Dialogue: "${parsed.dialogue?.substring(0, 50)}..."`);
+    console.log(`[LLM_WIZARD] ⏱️  Latency: ${computeApprox.latencyMs.toFixed(1)}ms | Tokens: ${usage.totalTokens}`);
+
+    return {
+      dialogue: parsed.dialogue || fallbackDialogues[grade] || fallbackDialogues.C,
+      provider: provider.provider,
+      usage,
+      computeApprox,
+      providerResponse: response
+    };
+  } catch (error) {
+    console.log(`[LLM_WIZARD] ❌ Provider call failed: ${error.message}`);
+    logger.error('Wizard dialogue provider call failed', { message: error.message });
+    recordProviderError();
+    recordMockResponse();
+    recordLlmUsage({ inputTokens: 0, outputTokens: 0, totalTokens: 0 });
+    return {
+      dialogue: fallbackDialogues[grade] || fallbackDialogues.C,
+      provider: provider.provider,
+      usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+      computeApprox: null,
+      providerResponse: mockResponse({ dialogue: fallbackDialogues[grade] || fallbackDialogues.C, reason: 'mock_provider_error' })
+    };
+  }
+}
+
+/**
  * Generate concise narration text for an already-approved resolution outcome.
  */
 export async function generateNarration({

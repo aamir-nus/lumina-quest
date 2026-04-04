@@ -235,3 +235,738 @@
 .delete-btn:disabled {
   opacity: 0.5;
 }
+
+/* Wizard Bubble Styles */
+.wizardBubble {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 20px 0;
+  min-height: 120px;
+}
+
+.speechBubble {
+  background: linear-gradient(180deg, #fff9f0, #fff5e6);
+  border: 3px solid var(--accent);
+  border-radius: 16px;
+  padding: 16px 20px;
+  max-width: 500px;
+  margin-bottom: 12px;
+  position: relative;
+  box-shadow: 0 4px 12px rgba(204, 111, 77, 0.2);
+  animation: bubblePop 0.4s ease-out;
+}
+
+.speechBubble::after {
+  content: '';
+  position: absolute;
+  bottom: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-top: 12px solid var(--accent);
+}
+
+.speechBubble p {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+@keyframes bubblePop {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Wizard Sprite with Bobbing Animation */
+.wizardSprite {
+  position: relative;
+  animation: wizardBob 1.2s ease-in-out infinite;
+}
+
+@keyframes wizardBob {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.wizardBody {
+  position: relative;
+  width: 64px;
+  height: 80px;
+}
+
+/* Wizard Hat */
+.wizardHat {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+}
+
+.hatTop {
+  width: 0;
+  height: 0;
+  border-left: 18px solid transparent;
+  border-right: 18px solid transparent;
+  border-bottom: 32px solid var(--accent-2);
+  position: relative;
+}
+
+.hatTop::after {
+  content: '';
+  position: absolute;
+  top: 8px;
+  left: -12px;
+  width: 0;
+  height: 0;
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-bottom: 20px solid #2a6e5c;
+}
+
+.hatBrim {
+  width: 48px;
+  height: 8px;
+  background: var(--accent-2);
+  border-radius: 2px;
+  position: absolute;
+  top: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.hatStar {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #ffd700;
+  font-size: 12px;
+  animation: starTwinkle 1.5s ease-in-out infinite;
+}
+
+@keyframes starTwinkle {
+  0%, 100% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: translateX(-50%) scale(0.85);
+  }
+}
+
+/* Wizard Face */
+.wizardFace {
+  position: absolute;
+  top: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 32px;
+  background: #ffe4c4;
+  border: 2px solid var(--ink);
+  border-radius: 4px;
+}
+
+.wizardEye {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: var(--ink);
+  border-radius: 50%;
+  top: 10px;
+}
+
+.wizardEye.left {
+  left: 10px;
+}
+
+.wizardEye.right {
+  right: 10px;
+}
+
+.wizardBeard {
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 44px;
+}
+
+.beardRow {
+  height: 4px;
+  background: #e0e0e0;
+  border: 1px solid var(--ink);
+  margin-bottom: 2px;
+  border-radius: 0 0 8px 8px;
+}
+
+.beardRow:nth-child(1) {
+  width: 100%;
+}
+
+.beardRow:nth-child(2) {
+  width: 80%;
+  margin-left: 10%;
+}
+
+.beardRow:nth-child(3) {
+  width: 60%;
+  margin-left: 20%;
+}
+
+/* Wizard Robe */
+.wizardRobe {
+  position: absolute;
+  top: 52px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 48px;
+  height: 28px;
+  background: linear-gradient(180deg, var(--accent-2), #2a6e5c);
+  border: 2px solid var(--ink);
+  border-radius: 0 0 8px 8px;
+}
+
+.robeFold {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+}
+
+/* Broomstick Debug Icon */
+.broomstickIcon {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  font-size: 20px;
+  cursor: help;
+  user-select: none;
+  padding: 4px;
+  border-radius: 50%;
+  transition: transform 0.2s ease, background 0.2s ease;
+  animation: broomFloat 2s ease-in-out infinite;
+}
+
+.broomstickIcon:hover {
+  transform: scale(1.15);
+  background: rgba(255, 255, 255, 0.8);
+}
+
+@keyframes broomFloat {
+  0%, 100% {
+    transform: translateY(0) rotate(-5deg);
+  }
+  50% {
+    transform: translateY(-4px) rotate(5deg);
+  }
+}
+
+/* Debug Tooltip */
+.debugTooltip {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  width: 280px;
+  background: linear-gradient(180deg, #fff9f0, #ffe8d6);
+  border: 2px solid var(--accent);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 8px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+  animation: tooltipFade 0.2s ease-out;
+  z-index: 100;
+}
+
+.debugTooltip::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  right: 12px;
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 8px solid var(--accent);
+}
+
+@keyframes tooltipFade {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.debugHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.debugHeader strong {
+  color: var(--accent);
+  font-size: 13px;
+}
+
+.confidence {
+  font-size: 12px;
+  background: var(--accent-2);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.debugExplanation {
+  margin: 8px 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.debugWildcard,
+.debugProvider {
+  margin: 4px 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.debugMetrics {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.debugMetrics span {
+  font-size: 11px;
+  color: var(--muted);
+  background: rgba(63, 143, 123, 0.1);
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+/* Player Panel Styles */
+.gameMenu {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.gameList {
+  display: grid;
+  gap: 12px;
+}
+
+.gameListItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.gameInfo {
+  flex: 1;
+}
+
+.gameInfo p {
+  margin: 4px 0;
+}
+
+.playthroughView {
+  display: flex;
+  flex-direction: column;
+  height: fit-content;
+  min-height: 500px;
+}
+
+.topHud {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.backButton {
+  background: linear-gradient(180deg, #d67856, #b65f3f);
+  color: white;
+  padding: 8px 16px;
+  font-size: 14px;
+}
+
+.hudStats {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  font-size: 14px;
+}
+
+.statusBadge {
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.statusBadge.active {
+  background: rgba(63, 143, 123, 0.2);
+  color: var(--accent-2);
+}
+
+.statusBadge.won {
+  background: rgba(63, 143, 123, 0.3);
+  color: #2a6e5c;
+}
+
+.statusBadge.lost {
+  background: rgba(204, 111, 77, 0.3);
+  color: #b65f3f;
+}
+
+.gameArea {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.actionInput {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.actionInput input {
+  flex: 1;
+}
+
+/* Enhanced Ending Panel Styles */
+.endingPanel {
+  margin-top: 20px;
+  border: 3px solid rgba(31, 47, 56, 0.3);
+  border-radius: 16px;
+  padding: 20px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 245, 230, 0.85));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  animation: endingFadeIn 0.6s ease-out;
+}
+
+.endingPanel.won {
+  background: linear-gradient(180deg, rgba(200, 255, 200, 0.8), rgba(220, 255, 220, 0.7));
+  border-color: rgba(76, 175, 80, 0.3);
+}
+
+.endingPanel.lost {
+  background: linear-gradient(180deg, rgba(255, 220, 220, 0.8), rgba(255, 235, 235, 0.7));
+  border-color: rgba(244, 67, 54, 0.3);
+}
+
+@keyframes endingFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Grade Header */
+.gradeHeader {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.gradeDisplay {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 24px;
+  border: 4px solid;
+  border-radius: 50%;
+  width: 80px;
+  height: 80px;
+  margin-bottom: 12px;
+  background: white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  animation: gradePop 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes gradePop {
+  0% {
+    transform: scale(0) rotate(-180deg);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2) rotate(10deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+.gradeEmoji {
+  font-size: 28px;
+}
+
+.gradeLetter {
+  font-size: 32px;
+  font-weight: bold;
+  font-family: 'Courier New', monospace;
+}
+
+/* Score Card */
+.scoreCard {
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.scoreCard h4 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  color: var(--accent);
+}
+
+.journeyStats {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: rgba(63, 143, 123, 0.1);
+  border-radius: 8px;
+}
+
+.statItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.statLabel {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.statValue {
+  font-size: 20px;
+  font-weight: bold;
+  color: var(--ink);
+}
+
+/* Choices History */
+.choicesHistory {
+  margin-top: 12px;
+}
+
+.choicesHistory h5 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.choiceItem {
+  display: flex;
+  gap: 12px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  border-left: 3px solid var(--accent-2);
+}
+
+.choiceTurn {
+  font-size: 12px;
+  font-weight: bold;
+  color: var(--accent-2);
+  min-width: 60px;
+  text-align: center;
+  padding: 4px;
+  background: rgba(63, 143, 123, 0.1);
+  border-radius: 4px;
+  height: fit-content;
+}
+
+.choiceDetails {
+  flex: 1;
+}
+
+.choiceAction {
+  margin: 0 0 4px 0;
+  font-size: 14px;
+  font-style: italic;
+  color: var(--ink);
+}
+
+.choiceResult {
+  margin: 0;
+}
+
+.choiceBadge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.choiceBadge.positive {
+  background: rgba(76, 175, 80, 0.2);
+  color: #2e7d32;
+}
+
+.choiceBadge.negative {
+  background: rgba(244, 67, 54, 0.2);
+  color: #c62828;
+}
+
+/* Wizard Ending */
+.wizardEnding {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: linear-gradient(90deg, rgba(255, 249, 240, 0.8), rgba(255, 245, 230, 0.6));
+  border-radius: 12px;
+  border: 2px solid var(--accent);
+  margin-bottom: 16px;
+  animation: wizardEntrance 0.8s ease-out;
+}
+
+@keyframes wizardEntrance {
+  0% {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.wizardEndingSprite {
+  flex-shrink: 0;
+}
+
+.miniWizard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: miniWizardBob 1s ease-in-out infinite;
+}
+
+@keyframes miniWizardBob {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.miniHat {
+  font-size: 32px;
+}
+
+.miniFace {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: -8px;
+}
+
+.miniEye {
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.wizardSpeechBubble {
+  flex: 1;
+  background: white;
+  border-radius: 12px;
+  padding: 12px 16px;
+  position: relative;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.wizardSpeechBubble::before {
+  content: '';
+  position: absolute;
+  left: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-top: 12px solid transparent;
+  border-bottom: 12px solid transparent;
+  border-right: 12px solid white;
+}
+
+.wizardSpeechBubble p {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+/* Ending Actions */
+.endingActions {
+  text-align: center;
+}
+
+.playAgainBtn {
+  background: linear-gradient(180deg, #4caf50, #388e3c);
+  color: white;
+  padding: 12px 32px;
+  font-size: 16px;
+  font-weight: bold;
+  border: none;
+}
+
+.playAgainBtn:hover {
+  background: linear-gradient(180deg, #66bb6a, #43a047);
+  transform: scale(1.05);
+}
