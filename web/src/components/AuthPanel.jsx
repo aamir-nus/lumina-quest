@@ -31,27 +31,34 @@ export function AuthPanel({ onAuth }) {
 
   return (
     <section className="card" aria-live="polite">
-      <h2>Auth</h2>
-      <p className="muted">Create an admin and a user account to test both journeys.</p>
+      <h2>{mode === 'login' ? 'Welcome Back' : 'Join Adventure'}</h2>
+      {mode === 'login' && (
+        <p className="muted">
+          <strong>Default admin:</strong> Username <code>admin</code> / Password <code>admin</code>
+        </p>
+      )}
+      {mode === 'register' && (
+        <p className="muted">Create an account to start your journey.</p>
+      )}
       <div className="row">
         <button type="button" className={mode === 'login' ? 'active' : ''} onClick={() => setMode('login')} aria-pressed={mode === 'login'}>Login</button>
         <button type="button" className={mode === 'register' ? 'active' : ''} onClick={() => setMode('register')} aria-pressed={mode === 'register'}>Register</button>
       </div>
-      <label htmlFor="auth-email">Email</label>
-      <input id="auth-email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email" />
+      <label htmlFor="auth-email">Email or Username</label>
+      <input id="auth-email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={mode === 'login' ? "admin or email@example.com" : "email@example.com"} />
       <label htmlFor="auth-password">Password</label>
       <input id="auth-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="password" type="password" />
       {mode === 'register' ? (
         <>
           <label htmlFor="auth-role">Role</label>
           <select id="auth-role" value={role} onChange={(e) => setRole(e.target.value)} aria-label="Select account role">
-          <option value="admin">admin</option>
-          <option value="user">user</option>
+          <option value="user">User (Play games)</option>
+          <option value="admin">Admin (Create games)</option>
           </select>
         </>
       ) : null}
       <button type="button" onClick={() => mutation.mutate()} disabled={mutation.isPending || !email || !password}>
-        {mutation.isPending ? 'Processing...' : mode}
+        {mutation.isPending ? 'Processing...' : mode === 'login' ? 'Login' : 'Register'}
       </button>
       {mutation.error ? <p className="error" role="alert">{authError}</p> : null}
     </section>

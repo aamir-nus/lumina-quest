@@ -81,6 +81,15 @@ button:disabled {
   color: #b42318;
 }
 
+code {
+  background: rgba(63, 143, 123, 0.15);
+  color: var(--accent-2);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+}
+
 .srOnly {
   position: absolute;
   width: 1px;

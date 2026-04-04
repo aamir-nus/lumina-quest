@@ -203,3 +203,18 @@
     transform: translateY(0);
   }
 }
+
+.delete-btn {
+  background: linear-gradient(180deg, #e8b4b4, #d49a9a);
+  color: #7f2b2b;
+  border-color: #c47f7f;
+}
+
+.delete-btn:hover:not(:disabled) {
+  background: linear-gradient(180deg, #d49a9a, #c47f7f);
+  filter: saturate(120%);
+}
+
+.delete-btn:disabled {
+  opacity: 0.5;
+}

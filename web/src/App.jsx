@@ -7,6 +7,7 @@ import { PlayerPanel } from './components/PlayerPanel';
 export default function App() {
   const [auth, setAuth] = useState(null);
   const [playtestSessionId, setPlaytestSessionId] = useState('');
+  const [adminTab, setAdminTab] = useState('player-forge'); // 'player-forge' | 'user-journey'
 
   const me = useMemo(() => auth?.user || null, [auth]);
 
@@ -31,18 +32,86 @@ export default function App() {
   const logout = () => {
     api.post('/auth/logout').catch(() => {});
     setAuth(null);
+    setAdminTab('player-forge');
   };
 
+  // Not authenticated - show login screen
+  if (!me) {
+    return (
+      <main className="login-screen">
+        <header className="logo-header">
+          <h1 className="pixel-title">
+            <span className="pixel-char" data-delay="0">L</span>
+            <span className="pixel-char" data-delay="50">u</span>
+            <span className="pixel-char" data-delay="100">m</span>
+            <span className="pixel-char" data-delay="150">i</span>
+            <span className="pixel-char" data-delay="200">n</span>
+            <span className="pixel-char" data-delay="250">a</span>
+            <span className="pixel-char spacer" data-delay="300">&nbsp;</span>
+            <span className="pixel-char" data-delay="350">Q</span>
+            <span className="pixel-char" data-delay="400">u</span>
+            <span className="pixel-char" data-delay="450">e</span>
+            <span className="pixel-char" data-delay="500">s</span>
+            <span className="pixel-char" data-delay="550">t</span>
+            <span className="pixel-beta">[beta]</span>
+          </h1>
+          <p className="pixel-subtitle">Adventure Awaits</p>
+        </header>
+        <div className="auth-container">
+          <AuthPanel onAuth={onAuth} />
+        </div>
+      </main>
+    );
+  }
+
+  // Authenticated user view
   return (
     <main>
       <header>
-        <h1>LuminaQuest Iteration 2 Hardening</h1>
-        {me ? <button onClick={logout}>Logout</button> : null}
+        <div className="header-left">
+          <h1 className="compact-title">LuminaQuest <span className="beta-badge">[beta]</span></h1>
+        </div>
+        <div className="header-right">
+          {me?.role === 'admin' && (
+            <div className="admin-tabs">
+              <button
+                type="button"
+                className={adminTab === 'player-forge' ? 'active' : ''}
+                onClick={() => setAdminTab('player-forge')}
+                aria-pressed={adminTab === 'player-forge'}
+              >
+                Player Forge
+              </button>
+              <button
+                type="button"
+                className={adminTab === 'user-journey' ? 'active' : ''}
+                onClick={() => setAdminTab('user-journey')}
+                aria-pressed={adminTab === 'user-journey'}
+              >
+                User Journey
+              </button>
+            </div>
+          )}
+          <span className="user-badge">{me.email}</span>
+          <button onClick={logout}>Logout</button>
+        </div>
       </header>
+
       <div className="grid">
-        <AuthPanel onAuth={onAuth} />
-        <AdminPanel me={me} onPlaytestSession={setPlaytestSessionId} />
-        <PlayerPanel me={me} externalSessionId={playtestSessionId} />
+        {me?.role === 'admin' ? (
+          // Admin view with tabs
+          <>
+            {adminTab === 'player-forge' && (
+              <AdminPanel me={me} onPlaytestSession={setPlaytestSessionId} />
+            )}
+            {adminTab === 'user-journey' && (
+              <PlayerPanel me={me} externalSessionId={playtestSessionId} />
+            )}
+          </>
+        ) : (
+          // Regular user view - just player journey
+          <PlayerPanel me={me} externalSessionId={playtestSessionId} />
+        )}
       </div>
     </main>
   );

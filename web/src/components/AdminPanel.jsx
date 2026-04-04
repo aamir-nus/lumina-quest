@@ -32,6 +32,16 @@ export const AdminPanel = memo(function AdminPanel({ me, onPlaytestSession }) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['my-games'] })
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (gameId) => (await api.delete(`/games/${gameId}`)).data,
+    onSuccess: (_, deletedGameId) => {
+      queryClient.invalidateQueries({ queryKey: ['my-games'] });
+      if (selectedGameId === deletedGameId) {
+        setSelectedGameId('');
+      }
+    }
+  });
+
   const publishMutation = useMutation({
     mutationFn: async (gameId) => (await api.post(`/games/${gameId}/publish`)).data.game,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['my-games'] })
@@ -103,6 +113,18 @@ export const AdminPanel = memo(function AdminPanel({ me, onPlaytestSession }) {
               <button type="button" onClick={() => setSelectedGameId(game._id)} className={selectedGameId === game._id ? 'active' : ''}>Graph</button>
               <button type="button" onClick={() => publishMutation.mutate(game._id)} disabled={publishMutation.isPending || game.status === 'public'}>
                 {game.status === 'public' ? 'Published' : 'Publish'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm(`Delete "${game.title}"? This cannot be undone.`)) {
+                    deleteMutation.mutate(game._id);
+                  }
+                }}
+                disabled={deleteMutation.isPending}
+                className="delete-btn"
+              >
+                {deleteMutation.isPending && deleteMutation.variables === game._id ? 'Deleting...' : 'Delete'}
               </button>
             </div>
           </div>
