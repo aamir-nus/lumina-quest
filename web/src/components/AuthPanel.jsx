@@ -30,24 +30,20 @@ export function AuthPanel({ onAuth }) {
   })();
 
   return (
-    <section className="card" aria-live="polite">
-      <h2>{mode === 'login' ? 'Welcome Back' : 'Join Adventure'}</h2>
-      {mode === 'login' && (
-        <p className="muted">
-          <strong>Default admin:</strong> Username <code>admin</code> / Password <code>admin</code>
-        </p>
-      )}
-      {mode === 'register' && (
-        <p className="muted">Create an account to start your journey.</p>
-      )}
-      <div className="row">
+    <section className="card auth-card" aria-live="polite">
+      <div className="auth-header">
+        <h2>{mode === 'login' ? 'Welcome Back' : 'Join Adventure'}</h2>
+        {mode === 'register' && (
+          <p className="muted">Create an account to start your journey.</p>
+        )}
+      </div>
+      <div className="row auth-row">
         <button type="button" className={mode === 'login' ? 'active' : ''} onClick={() => setMode('login')} aria-pressed={mode === 'login'}>Login</button>
         <button type="button" className={mode === 'register' ? 'active' : ''} onClick={() => setMode('register')} aria-pressed={mode === 'register'}>Register</button>
       </div>
-      <label htmlFor="auth-email">Email or Username</label>
-      <input id="auth-email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={mode === 'login' ? "admin or email@example.com" : "email@example.com"} />
-      <label htmlFor="auth-password">Password</label>
-      <input id="auth-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="password" type="password" />
+      
+      <input id="auth-email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={mode === 'login' ? "User : e.g. admin or email@example.com" : "email@example.com"} />
+      <input id="auth-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" type="password" />
       {mode === 'register' ? (
         <>
           <label htmlFor="auth-role">Role</label>
