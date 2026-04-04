@@ -35,6 +35,7 @@ h3 {
 
 input,
 select,
+textarea,
 button {
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -43,10 +44,16 @@ button {
 }
 
 input,
-select {
+select,
+textarea {
   width: 100%;
   margin: 8px 0;
   background: #fffefb;
+}
+
+textarea {
+  resize: vertical;
+  font-family: inherit;
 }
 
 button {

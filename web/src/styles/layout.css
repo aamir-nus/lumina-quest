@@ -229,6 +229,13 @@ header {
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
 }
 
+/* Playthrough view should take more space */
+.playthroughView {
+  max-width: 800px;
+  width: 100%;
+  margin: 0 auto;
+}
+
 .card {
   border: 2px solid var(--line);
   background: linear-gradient(180deg, rgba(255, 251, 242, 0.95), rgba(255, 247, 236, 0.85));
