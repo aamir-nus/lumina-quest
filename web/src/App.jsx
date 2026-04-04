@@ -41,18 +41,19 @@ export default function App() {
       <main className="login-screen">
         <header className="logo-header">
           <h1 className="pixel-title">
-            <span className="pixel-char" data-delay="0">L</span>
-            <span className="pixel-char" data-delay="50">u</span>
-            <span className="pixel-char" data-delay="100">m</span>
-            <span className="pixel-char" data-delay="150">i</span>
-            <span className="pixel-char" data-delay="200">n</span>
-            <span className="pixel-char" data-delay="250">a</span>
-            <span className="pixel-char spacer" data-delay="300">&nbsp;</span>
-            <span className="pixel-char" data-delay="350">Q</span>
-            <span className="pixel-char" data-delay="400">u</span>
-            <span className="pixel-char" data-delay="450">e</span>
-            <span className="pixel-char" data-delay="500">s</span>
-            <span className="pixel-char" data-delay="550">t</span>
+            <span className="pixel-char" data-hover-delay="0">L</span>
+            <span className="pixel-char" data-hover-delay="40">u</span>
+            <span className="pixel-char" data-hover-delay="80">m</span>
+            <span className="pixel-char" data-hover-delay="120">i</span>
+            <span className="pixel-char" data-hover-delay="160">n</span>
+            <span className="pixel-char" data-hover-delay="200">a</span>
+            <span className="pixel-char spacer" data-hover-delay="0">&nbsp;</span>
+            <span className="pixel-char" data-hover-delay="240">Q</span>
+            <span className="pixel-char" data-hover-delay="280">u</span>
+            <span className="pixel-char" data-hover-delay="320">e</span>
+            <span className="pixel-char" data-hover-delay="360">s</span>
+            <span className="pixel-char" data-hover-delay="400">t</span>
+            <span className="sparkle">✨</span>
             <span className="pixel-beta">[beta]</span>
           </h1>
           <p className="pixel-subtitle">Adventure Awaits</p>
