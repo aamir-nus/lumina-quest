@@ -21,7 +21,8 @@ flowchart LR
 - **Provider Switching**: Support for `openrouter`, `lmstudio`, with extensible adapter pattern
 - **Visual State**: 8-bit styled presentation with layered components, transitions, and endings
 - **Observability**: Token usage tracking, compute metrics, and request tracing
-- **Security**: Cookie-first auth, optimistic concurrency, transaction wrapping, and structured errors
+- **Security**: Cookie-first auth, optimistic concurrency, transaction wrapping, structured errors
+- **Secrets Detection**: Pre-commit hooks using Gitleaks to prevent accidental commits of credentials
 - **Docker Support**: Single-command startup with full stack containerization
 
 ## Quick Start
@@ -120,6 +121,39 @@ LMSTUDIO_MODEL=google/gemma-3-4b
 - Canonical action endpoint is `POST /api/sessions/action`.
 - Every API response includes `x-request-id` for tracing failures.
 - Default admin user is automatically created on first startup.
+
+## Development Setup
+
+### Pre-commit Hooks (Required)
+
+This project uses **Gitleaks** to prevent accidental commits of secrets, API keys, or credentials.
+
+```bash
+# Install pre-commit hooks (one-time setup)
+pip install pre-commit
+pre-commit install
+```
+
+The pre-commit hook will automatically scan for secrets before each commit. If it finds anything, it will block the commit and show you what needs to be fixed.
+
+**Important:** Never bypass the pre-commit hook. If it blocks your commit, it means there's a security issue that needs to be addressed.
+
+### Updating Gitleaks Baseline
+
+If you need to update the baseline (rare, only when adding legitimate false-positives):
+
+```bash
+gitleaks detect --source . --baseline-path .secrets.baseline
+```
+
+### Security Best Practices
+
+1. **Never hardcode secrets** in source code
+2. **Always use environment variables** for sensitive data
+3. **Never provide default values** for secrets in code (even fake ones that look real)
+4. **Validate required environment variables** on startup
+5. **Use `.gitignore`** to prevent committing `.env` files
+6. **Rotate API keys immediately** if accidentally exposed
 
 ## Admin Guide
 
