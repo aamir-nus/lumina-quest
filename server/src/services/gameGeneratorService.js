@@ -30,7 +30,13 @@ function parseOutput(response, fallback = {}) {
     '{}';
 
   try {
-    return JSON.parse(outputText);
+    // Strip markdown code blocks (```json and ```)
+    let cleanedText = outputText
+      .replace(/```json\n?/g, '')
+      .replace(/```\n?/g, '')
+      .trim();
+
+    return JSON.parse(cleanedText);
   } catch (error) {
     logger.warn('Failed to parse LLM JSON output; using fallback', {
       message: error.message
