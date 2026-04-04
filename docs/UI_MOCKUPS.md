@@ -6,7 +6,7 @@ This diagram shows the complete flow of LLM-powered game actions, from user inpu
 
 ```mermaid
 sequenceDiagram
-    actor Player
+    participant Player
     participant API as Express API
     participant Engine as Session Engine
     participant LLM as LLM Resolver
@@ -25,7 +25,7 @@ sequenceDiagram
     Engine->>Engine: Check if terminal/max turns
     alt Terminal state
         Engine-->>API: terminal resolution
-        API-->>Player: "Game complete"
+        API-->>Player: Game complete
     end
 
     Note over Engine,LLM: CLASSIFICATION STAGE
@@ -40,7 +40,7 @@ sequenceDiagram
         LLM->>LLM: Build classification prompt
         Note over LLM: Game context, Scene narrative, Player input, Avenue options, Confidence guidelines, JSON schema
         LLM->>LMStudio: POST /v1/chat/completions
-        Note over LLM,LMStudio: Model: google/gemma-3-4b, Base URL: http://127.0.0.1:1234/v1
+        Note over LLM,LMStudio: Model google/gemma-3-4b | Base URL http://127.0.0.1:1234/v1
         LMStudio-->>LLM: JSON response
         Note over LLM: routeType, avenueId, confidence, explanation
     end
@@ -50,7 +50,7 @@ sequenceDiagram
 
     alt routeType is clarification
         Engine-->>API: Clarification needed
-        API-->>Player: "Please be more specific"
+        API-->>Player: Please be more specific
     end
 
     Note over Engine,LLM: RESOLUTION STAGE
