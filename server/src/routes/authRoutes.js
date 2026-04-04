@@ -51,13 +51,29 @@ router.post('/register', asyncHandler(async (req, res) => {
 }));
 
 router.post('/login', asyncHandler(async (req, res) => {
-  const parsed = authSchema.pick({ email: true, password: true }).safeParse(req.body);
+  // Flexible login: accepts email or username (for admin convenience)
+  const loginSchema = z.object({
+    email: z.string().min(1), // Allow any string (username or email)
+    password: z.string().min(1) // Allow any non-empty password for login
+  });
+
+  const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
     throw new ApiError(400, 'INVALID_INPUT', 'Invalid input');
   }
 
   const { email, password } = parsed.data;
-  const user = await User.findOne({ email });
+
+  // Support username-style login for default admin
+  // If input is "admin", try to find admin@luminaquest.local
+  let user;
+  if (email === 'admin') {
+    user = await User.findOne({ email: 'admin@luminaquest.local', role: 'admin' });
+  } else {
+    // Standard email lookup
+    user = await User.findOne({ email });
+  }
+
   if (!user) {
     await bcrypt.compare(password, DUMMY_PASSWORD_HASH);
     throw new ApiError(401, 'INVALID_CREDENTIALS', 'Invalid credentials');

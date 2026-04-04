@@ -229,4 +229,17 @@ router.post('/:id/publish', requireRole('admin'), asyncHandler(async (req, res) 
   return res.json({ game });
 }));
 
+router.delete('/:id', requireRole('admin'), asyncHandler(async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    throw new ApiError(400, 'INVALID_GAME_ID', 'Invalid game id');
+  }
+
+  const game = await GameTemplate.findOneAndDelete({ _id: req.params.id, adminId: req.user.id });
+  if (!game) {
+    throw new ApiError(404, 'GAME_NOT_FOUND', 'Game not found');
+  }
+
+  return res.json({ deleted: true, gameId: req.params.id });
+}));
+
 export default router;
