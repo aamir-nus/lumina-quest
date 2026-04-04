@@ -130,6 +130,13 @@ export function AvenueCarousel({ scene, onEditAvenue, onRemoveAvenue }) {
                 className={`avenue-card ${avenue.origin === 'ai_generated' ? 'ai-generated' : ''}`}
               >
                 <div className="avenue-card-visual">
+                  <button
+                    onClick={() => onRemoveAvenue(avenue.avenueId)}
+                    className="avenue-delete-btn"
+                    aria-label="Delete option"
+                  >
+                    🗑️
+                  </button>
                   <span className="avenue-icon">{getOriginIcon(avenue)}</span>
                   <span className={`avenue-origin-badge ${getOriginClass(avenue)}`}>
                     {getOriginLabel(avenue)}
@@ -168,14 +175,6 @@ export function AvenueCarousel({ scene, onEditAvenue, onRemoveAvenue }) {
                     </button>
                   </div>
                 </div>
-
-                <button
-                  onClick={() => onRemoveAvenue(avenue.avenueId)}
-                  className="avenue-delete-btn"
-                  aria-label="Delete option"
-                >
-                  🗑️
-                </button>
               </div>
             ))
           ) : (

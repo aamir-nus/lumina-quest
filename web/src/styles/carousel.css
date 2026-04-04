@@ -140,7 +140,7 @@
 
 .avenue-carousel-wrapper {
   position: relative;
-  padding: 60px 50px 20px 50px;
+  padding: 0 50px;
   max-width: 1200px;
   margin: 0 auto;
   overflow: visible;
@@ -238,7 +238,7 @@
 .avenue-delete-btn {
   position: absolute;
   top: 8px;
-  right: 8px;
+  left: 8px;
   width: 36px;
   height: 36px;
   border-radius: 8px;
@@ -253,11 +253,6 @@
   font-size: 18px;
   transition: all 200ms ease;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-/* Position delete button within the visual area */
-.avenue-card-visual .avenue-delete-btn {
-  right: 8px;
 }
 
 .avenue-delete-btn:hover {
@@ -280,6 +275,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  padding: 50px 8px 8px 50px;
 }
 
 .avenue-icon {
@@ -289,7 +285,7 @@
 .avenue-origin-badge {
   position: absolute;
   top: 8px;
-  left: 8px;
+  right: 8px;
   padding: 3px 8px;
   font-size: 8px;
   border-radius: 4px;
@@ -352,12 +348,10 @@
 /* Avenue Card Content (40%) */
 .avenue-card-content {
   width: 45%;
-  padding: 14px 12px 12px 14px;
+  padding: 14px;
   display: flex;
   flex-direction: column;
   overflow: visible;
-  /* Ensure content doesn't overlap delete button */
-  padding-right: 50px;
 }
 
 .avenue-card-label {
@@ -370,18 +364,18 @@
   /* Don't truncate - show full text */
   word-wrap: break-word;
   overflow-wrap: break-word;
-  position: relative;
+  position: static;
   cursor: help;
   z-index: 1;
 }
 
 .avenue-card-label::after {
   content: attr(data-full-text);
-  position: absolute;
+  position: fixed;
   left: 50%;
-  transform: translateX(-50%);
-  bottom: calc(100% + 8px);
-  z-index: 9999;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 99999;
   background: rgba(31, 47, 56, 0.98);
   color: white;
   padding: 10px 14px;
@@ -416,16 +410,16 @@
   flex: 0 1 auto;
   min-height: 46px;
   cursor: help;
-  position: relative;
+  position: static;
 }
 
 .avenue-card-intent::after {
   content: attr(data-full-text);
-  position: absolute;
+  position: fixed;
   left: 50%;
-  transform: translateX(-50%);
-  bottom: calc(100% + 8px);
-  z-index: 9999;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 99999;
   background: rgba(31, 47, 56, 0.98);
   color: white;
   padding: 10px 14px;
@@ -469,6 +463,16 @@
   align-items: center;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  gap: 6px;
+}
+
+.avenue-stat-badge .value {
+  color: var(--accent-2);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100px;
 }
 
 .avenue-stat-badge .label {
@@ -476,12 +480,7 @@
   font-weight: 500;
   text-transform: none;
   letter-spacing: 0;
-  margin-right: 4px;
-}
-
-.avenue-stat-badge .value {
-  color: var(--accent-2);
-  font-weight: 700;
+  flex-shrink: 0;
 }
 
 .avenue-card-actions {
