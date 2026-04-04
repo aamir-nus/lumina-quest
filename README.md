@@ -15,6 +15,7 @@ flowchart LR
 ```
 
 ## Features
+
 - **Authored Scene Graph**: Deterministic game branches with server-authoritative turn resolution
 - **LLM Intent Mapping**: Free-form player input mapped to authored routes using configurable providers
 - **Provider Switching**: Support for `openrouter`, `lmstudio`, with extensible adapter pattern
@@ -23,6 +24,7 @@ flowchart LR
 - **Security**: Cookie-first auth, optimistic concurrency, transaction wrapping, and structured errors
 
 ## Quick Start
+
 1. `npm install`
 2. `cp .env.example .env`
 3. Set `JWT_SECRET` (24+ chars)
@@ -33,6 +35,7 @@ flowchart LR
 6. `npm run dev`
 
 ## Auth + API Notes
+
 - Auth is cookie-first (`httpOnly` cookie set on login/register, cleared on logout).
 - Frontend API client uses `withCredentials: true`.
 - Canonical action endpoint is `POST /api/sessions/action`.
@@ -40,10 +43,12 @@ flowchart LR
 - Frontend API base URL is configurable via `VITE_API_BASE_URL`.
 
 ## LLM Provider Switch
+
 - `LLM_PROVIDER=openrouter`
 - `LLM_PROVIDER=lmstudio`
 
 ## Docker (Lightweight, Multi-Arch)
+
 ```bash
 # linux x64
 docker buildx build --platform linux/amd64 -f server/Dockerfile -t luminaquest-server:amd64 .
@@ -55,9 +60,5 @@ docker buildx build --platform linux/arm64 -f web/Dockerfile -t luminaquest-web:
 ```
 
 ## Documentation
+
 - [API Reference](docs/API.md) - Complete API contract and endpoint documentation
-- [UI Mockups](docs/UI_MOCKUPS.md) - Visual design references
-- [Development Guide](DEVELOPMENT.md) - Setup, architecture, and contribution guidelines
-- [Changelog](CHANGELOG.md) - Project history and notable changes
-- [Admin Guide](for-admin.md) - Administration and observability features
-- [User Guide](for-user.md) - End-user documentation
