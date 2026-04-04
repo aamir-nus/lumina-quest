@@ -341,12 +341,16 @@ export async function generateWizardDialogue({ gameTitle, grade, points, targetP
   console.log(`[LLM_WIZARD] 📊 Grade: ${grade} | Points: ${points}/${targetPoints} | Status: ${status}`);
 
   const { provider, client } = createClient();
-  const fallbackDialogues = {
-    S: 'Magnificent! Your brilliance shines like a thousand stars! You are a true legend!',
-    A: 'Well done, brave adventurer! Your skills are most impressive!',
-    B: 'A respectable journey! You have proven yourself worthy.',
-    C: 'You survived... barely. Perhaps with more wisdom, next time will be better.',
-    D: 'Ahem. Perhaps adventuring is not your calling? Have you considered... farming?'
+
+  // Sharper personality-based fallback dialogues
+  const getFallbackDialogue = () => {
+    if (status === 'won') {
+      if (grade === 'S') return 'LEGENDARY! The stars themselves bow to your brilliance! You are truly chosen!';
+      if (grade === 'A') return 'Outstanding! Your potential is limitless. I sense great destinies ahead for you!';
+      if (grade === 'B') return 'You won. Competently. I suppose that counts for something these days.';
+    }
+    if (grade === 'C') return 'You survived. I\'ve seen slimes with better survival instincts, but... congrats?';
+    return 'Pathetic. My cauldron has more talent than you. Perhaps try a game with... less thinking?';
   };
 
   if (!provider.hasApiKey) {
@@ -354,41 +358,77 @@ export async function generateWizardDialogue({ gameTitle, grade, points, targetP
     recordMockResponse();
     recordLlmUsage({ inputTokens: 0, outputTokens: 0, totalTokens: 0 });
     return {
-      dialogue: fallbackDialogues[grade] || fallbackDialogues.C,
+      dialogue: getFallbackDialogue(),
       provider: provider.provider,
       usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
       computeApprox: null,
-      providerResponse: mockResponse({ dialogue: fallbackDialogues[grade] || fallbackDialogues.C, reason: 'mock_no_api_key' })
+      providerResponse: mockResponse({ dialogue: getFallbackDialogue(), reason: 'mock_no_api_key' })
     };
   }
 
   // Format choices for the prompt
   const choicesSummary = choices.map((c, i) => `${i + 1}. "${c.userQuery}" → ${c.resolvedAvenueId || 'wildcard'} (${c.pointsDelta >= 0 ? '+' : ''}${c.pointsDelta} pts)`).join('\n');
 
-  const tone = grade === 'S' || grade === 'A' ? 'praising and enthusiastic' :
-               grade === 'B' ? 'respectful and encouraging' :
-               grade === 'C' ? 'sympathetic but constructive' :
-               'teasing and humorous (suggesting a different career)';
+  // Define wizard personalities based on grade and outcome
+  const getWizardPersonality = () => {
+    if (status === 'won') {
+      if (grade === 'S' || grade === 'A') {
+        return {
+          persona: 'HOPEFUL WIZARD',
+          tone: 'ecstatic, reverent, almost weeping with joy',
+          traits: 'believes the player is the chosen one, sees limitless potential, dramatic and flowery language',
+          examples: 'speak like a mystic who has witnessed a prophecy fulfilled, use exclamation marks, reference stars/destiny'
+        };
+      }
+      if (grade === 'B') {
+        return {
+          persona: 'CYNIC WIZARD',
+          tone: 'dry, unimpressed, mildly disappointed',
+          traits: 'seen thousands of heroes, player is merely adequate, backhanded compliments',
+          examples: 'speak like someone who expects better, use phrases like "I suppose" and "adequate", subtle sarcasm'
+        };
+      }
+    }
+    if (grade === 'C') {
+      return {
+        persona: 'CYNIC WIZARD',
+        tone: 'disappointed, mocking, unimpressed',
+        traits: 'surprised the player survived at all, condescending',
+        examples: 'compare player unfavorably to slimes or goblins, express surprise at basic competence'
+      };
+    }
+    return {
+      persona: 'HARSH MASTER',
+      tone: 'insulting, dismissive, cruel',
+      traits: 'openly mocks player\'s intelligence, suggests they should quit adventuring',
+      examples: 'suggest farming or alchemy as better career paths, question their life choices, biting sarcasm'
+    };
+  };
+
+  const personality = getWizardPersonality();
 
   const prompt = [
-    `You are an 8-bit wizard NPC giving ending dialogue to a player who just completed a text adventure game.`,
+    `You are an 8-bit wizard NPC with a DISTINCT PERSONALITY giving ending dialogue to a player.`,
+    '',
+    `WIZARD PERSONALITY: ${personality.persona}`,
+    `Tone: ${personality.tone}`,
+    `Traits: ${personality.traits}`,
+    `Style Examples: ${personality.examples}`,
     '',
     `Game: ${gameTitle}`,
     `Player Performance:`,
     `- Grade: ${grade}`,
     `- Points: ${points} / Target: ${targetPoints}`,
     `- Turns: ${turnsUsed} / Max: ${maxTurns}`,
-    `- Result: ${status}`,
+    `- Result: ${status === 'won' ? 'VICTORY' : 'DEFEAT'}`,
     '',
     `Player Choices:\n${choicesSummary || 'No choices recorded'}`,
     '',
-    `Tone: ${tone}`,
-    '',
-    `Generate a SHORT, witty 1-2 sentence response (max 30 words) that:`,
-    `- Matches the tone for their grade`,
-    `- References their performance in a clever way`,
-    `- Stays in character as an 8-bit wizard`,
-    `- Is memorable and fun`,
+    `Generate a SHORT, SHARP response (max 25 words) that:`,
+    `- EMBODIES your specific personality type (${personality.persona})`,
+    `- Is MEMORABLE and leaves a strong impression`,
+    `- References their grade (${grade}) and result (${status})`,
+    `- Uses dramatic language appropriate to your personality`,
     '',
     `Return strict JSON only: {"dialogue":"short response"}`
   ].join('\n');
@@ -402,7 +442,7 @@ export async function generateWizardDialogue({ gameTitle, grade, points, targetP
         input: [
           {
             role: 'system',
-            content: [{ type: 'input_text', text: 'You are a witty 8-bit wizard NPC who gives memorable ending dialogues based on player performance.' }]
+            content: [{ type: 'input_text', text: `You are an 8-bit wizard NPC with one of three personalities: HOPEFUL (for excellent grades), CYNIC (for mediocre grades), or HARSH MASTER (for failures). Stay strictly in character.` }]
           },
           {
             role: 'user',
@@ -415,7 +455,7 @@ export async function generateWizardDialogue({ gameTitle, grade, points, targetP
     );
 
     console.log('[LLM_WIZARD] ✅ Got LLM response, parsing...');
-    const parsed = parseOutput(response, { dialogue: fallbackDialogues[grade] || fallbackDialogues.C });
+    const parsed = parseOutput(response, { dialogue: getFallbackDialogue() });
     const usage = parseUsage(response);
     const computeApprox = captureComputeEnd(provider.provider, computeStart);
     recordLlmUsage(usage);
@@ -424,7 +464,7 @@ export async function generateWizardDialogue({ gameTitle, grade, points, targetP
     console.log(`[LLM_WIZARD] ⏱️  Latency: ${computeApprox.latencyMs.toFixed(1)}ms | Tokens: ${usage.totalTokens}`);
 
     return {
-      dialogue: parsed.dialogue || fallbackDialogues[grade] || fallbackDialogues.C,
+      dialogue: parsed.dialogue || getFallbackDialogue(),
       provider: provider.provider,
       usage,
       computeApprox,
@@ -436,12 +476,13 @@ export async function generateWizardDialogue({ gameTitle, grade, points, targetP
     recordProviderError();
     recordMockResponse();
     recordLlmUsage({ inputTokens: 0, outputTokens: 0, totalTokens: 0 });
+    const fallback = getFallbackDialogue();
     return {
-      dialogue: fallbackDialogues[grade] || fallbackDialogues.C,
+      dialogue: fallback,
       provider: provider.provider,
       usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
       computeApprox: null,
-      providerResponse: mockResponse({ dialogue: fallbackDialogues[grade] || fallbackDialogues.C, reason: 'mock_provider_error' })
+      providerResponse: mockResponse({ dialogue: fallback, reason: 'mock_provider_error' })
     };
   }
 }
