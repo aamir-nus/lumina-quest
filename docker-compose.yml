@@ -14,5 +14,7 @@ services:
       timeout: 5s
       retries: 5
 
+# Named volume persists data across docker compose down/up
+# Only deleted with: docker volume rm mongo_data or docker compose down -v
 volumes:
   mongo_data:
