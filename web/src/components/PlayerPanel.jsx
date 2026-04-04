@@ -4,6 +4,7 @@ import { api } from '../api';
 import { EndingPanel } from './EndingPanel';
 import { GameStage } from './GameStage';
 import { SceneTransitionOverlay } from './SceneTransitionOverlay';
+import { WizardBubble } from './WizardBubble';
 
 function sanitizeClientInput(value) {
   return String(value || '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 500);
@@ -16,11 +17,23 @@ export function PlayerPanel({ me, externalSessionId }) {
   const [sessionId, setSessionId] = useState('');
   const [input, setInput] = useState('');
   const [lastResolution, setLastResolution] = useState(null);
+  const [showGameMenu, setShowGameMenu] = useState(true);
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (externalSessionId) setSessionId(externalSessionId);
+    if (externalSessionId) {
+      setSessionId(externalSessionId);
+      setShowGameMenu(false);
+    }
   }, [externalSessionId]);
+
+  useEffect(() => {
+    if (sessionId) {
+      setShowGameMenu(false);
+    } else {
+      setShowGameMenu(true);
+    }
+  }, [sessionId]);
 
   const publicGames = useQuery({
     queryKey: ['public-games'],
@@ -41,7 +54,10 @@ export function PlayerPanel({ me, externalSessionId }) {
 
   const startMutation = useMutation({
     mutationFn: async (gameId) => (await api.post('/sessions/start', { gameId })).data.session,
-    onSuccess: (session) => setSessionId(session._id)
+    onSuccess: (session) => {
+      setSessionId(session._id);
+      setShowGameMenu(false);
+    }
   });
 
   const actionMutation = useMutation({
@@ -88,110 +104,125 @@ export function PlayerPanel({ me, externalSessionId }) {
     );
   }
 
-  return (
-    <section className="card" aria-live="polite">
-      <h2>Player Journey</h2>
-      <p className="muted">Signed in as: {me?.email || 'guest'} ({me?.role || 'n/a'})</p>
+  // Game Menu View
+  if (showGameMenu) {
+    return (
+      <section className="card gameMenu" aria-live="polite">
+        <h2>Choose Your Adventure</h2>
+        <p className="muted">Signed in as: {me?.email || 'guest'} ({me?.role || 'n/a'})</p>
 
-      <div className="list">
-        {(publicGames.data || []).map((gameItem) => (
-          <div key={gameItem._id} className="listItem">
-            <div>
-              <strong>{gameItem.title}</strong>
-              <p className="muted">target: {gameItem.constraints.targetPoints} | turns: {gameItem.constraints.maxTurns}</p>
+        <div className="list gameList">
+          {(publicGames.data || []).map((gameItem) => (
+            <div key={gameItem._id} className="listItem gameListItem">
+              <div className="gameInfo">
+                <strong>{gameItem.title}</strong>
+                <p className="muted">{gameItem.description || 'A mysterious adventure awaits...'}</p>
+                <p className="muted">target: {gameItem.constraints.targetPoints} | turns: {gameItem.constraints.maxTurns}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => startMutation.mutate(gameItem._id)}
+                disabled={!me || startMutation.isPending}
+              >
+                {startMutation.isPending ? 'Starting...' : 'Start'}
+              </button>
             </div>
-            <button type="button" onClick={() => startMutation.mutate(gameItem._id)} disabled={!me || startMutation.isPending}>
-              Start
-            </button>
-          </div>
-        ))}
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  // Playthrough View
+  return (
+    <section className="card playthroughView" aria-live="polite">
+      {/* Top HUD - Always Visible */}
+      <div className="topHud">
+        <button
+          type="button"
+          onClick={() => {
+            setSessionId('');
+            setShowGameMenu(true);
+            setLastResolution(null);
+          }}
+          className="backButton"
+        >
+          ← Back to Games
+        </button>
+        <div className="hudStats">
+          <span>Points: {session?.stats?.points || 0}</span>
+          <span>Turn: {session?.stats?.turnsUsed || 0}/{game?.constraints?.maxTurns || 0}</span>
+          <span className={`statusBadge ${session?.status}`}>{session?.status || 'active'}</span>
+        </div>
       </div>
 
-      {sessionId && sessionQuery.isLoading ? <p className="muted">Loading current session...</p> : null}
-      {sessionId && sessionQuery.error ? <p className="error">Unable to load this session snapshot.</p> : null}
+      {sessionId && sessionQuery.isLoading ? (
+        <p className="muted">Loading adventure...</p>
+      ) : null}
 
-      {session ? (
+      {sessionId && sessionQuery.error ? (
+        <p className="error">Unable to load this session.</p>
+      ) : null}
+
+      {session && scene ? (
         <>
-          <div className="hud">
-            <span>Points: {session.stats.points}</span>
-            <span>Turns: {session.stats.turnsUsed}/{game.constraints.maxTurns}</span>
-            <span>Status: {session.status}</span>
-            <span>Points To Target: {pointsToTarget}</span>
-            <span>Turns Remaining: {turnsRemaining}</span>
-            <span>{session.isPlaytest ? 'Playtest Session' : 'Published Session'}</span>
-          </div>
+          {/* Main Game Area */}
+          <div className="gameArea">
+            {/* Wizard Bubble with Dialogue */}
+            <WizardBubble narrative={scene.narrative} lastResolution={lastResolution} />
 
-          <div className="scene animatedScene">
-            <h3>{scene?.sceneId}</h3>
-            <p>{scene?.narrative}</p>
-            <GameStage scene={scene} visualState={session.visualState} />
-            <SceneTransitionOverlay transition={transition} />
-          </div>
-
-          {lastResolution ? (
-            <div className={`resolutionBadge ${lastResolution.type || 'avenue'}`}>
-              <strong>Route: {lastResolution.type || 'avenue'}</strong>
-              <span> confidence {Number(lastResolution.confidence || 0).toFixed(2)}</span>
-              {lastResolution.wildcardMode ? <span> | {lastResolution.wildcardMode}</span> : null}
-              {lastResolution.llm?.provider ? <span> | provider: {lastResolution.llm.provider}</span> : null}
-              <p>{lastResolution.explanation}</p>
-              <div className="metricsWidget compact">
-                <p className="muted">
-                  tokens in/out/total: {lastResolution.llm?.tokens?.inputTokens || 0}/
-                  {lastResolution.llm?.tokens?.outputTokens || 0}/
-                  {lastResolution.llm?.tokens?.totalTokens || 0}
-                </p>
-                <p className="muted">
-                  compute approx latency/cpu(mem): {Number(lastResolution.llm?.computeApprox?.latencyMs || 0).toFixed(1)}ms /
-                  {Number(lastResolution.llm?.computeApprox?.cpuUserMs || 0).toFixed(1)}+
-                  {Number(lastResolution.llm?.computeApprox?.cpuSystemMs || 0).toFixed(1)}ms (
-                  {Number(lastResolution.llm?.computeApprox?.rssMb || 0).toFixed(1)}MB RSS)
-                </p>
-              </div>
+            {/* Game Stage Visual */}
+            <div className="scene animatedScene">
+              <GameStage scene={scene} visualState={session.visualState} />
+              <SceneTransitionOverlay transition={transition} />
             </div>
-          ) : null}
 
-          <div className="chips">
-              {(scene?.avenues || []).map((avenue) => (
-              <button type="button" key={avenue.avenueId} onClick={() => setInput(avenue.label)} className="chipBtn">
-                {avenue.label}
-              </button>
-            ))}
+            {/* Action Options */}
+            {session.status === 'active' && (
+              <>
+                <div className="chips">
+                  {(scene.avenues || []).map((avenue) => (
+                    <button
+                      type="button"
+                      key={avenue.avenueId}
+                      onClick={() => setInput(avenue.label)}
+                      className="chipBtn"
+                    >
+                      {avenue.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="actionInput">
+                  <label htmlFor="player-action" className="srOnly">Describe your action</label>
+                  <input
+                    id="player-action"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder="Or describe your own action..."
+                    aria-label="Describe your action"
+                    disabled={session.status !== 'active'}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => actionMutation.mutate()}
+                    disabled={!input || actionMutation.isPending || session.status !== 'active'}
+                  >
+                    {actionMutation.isPending ? '⏳' : 'Send'}
+                  </button>
+                </div>
+
+                {actionMutation.error ? (
+                  <p className="error" role="alert">
+                    {actionMutation.error.response?.data?.error?.message || 'Action failed. Please retry.'}
+                  </p>
+                ) : null}
+              </>
+            )}
           </div>
 
-          <div className="row">
-            <label htmlFor="player-action" className="srOnly">Describe your action</label>
-            <input
-              id="player-action"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Describe your action"
-              aria-label="Describe your action"
-              disabled={session.status !== 'active'}
-            />
-            <button type="button" onClick={() => actionMutation.mutate()} disabled={!input || actionMutation.isPending || session.status !== 'active'}>
-              {actionMutation.isPending ? 'Resolving...' : 'Send'}
-            </button>
-          </div>
-          {actionMutation.error ? (
-            <p className="error" role="alert">
-              {actionMutation.error.response?.data?.error?.message || 'Action failed. Please retry.'}
-            </p>
-          ) : null}
-
-          <div className="history">
-            {historyQuery.isLoading ? <p className="muted">Loading session history...</p> : null}
-            {historyQuery.error ? <p className="error">Unable to load history right now.</p> : null}
-            {(historyQuery.data || []).slice().reverse().map((item) => (
-              <div key={`${item.turn}-${item.sceneId}-${item.userQuery}`} className="historyItem">
-                <strong>Turn {item.turn}</strong>
-                <p>{item.userQuery}</p>
-                <p>{item.narration}</p>
-                <p className="muted">{item.resolvedAvenueId || 'wildcard/clarification'} | Δ {item.pointsDelta}</p>
-              </div>
-            ))}
-          </div>
-          <EndingPanel session={session} game={game} />
+          {/* Ending Panel */}
+          <EndingPanel session={session} game={game} history={historyQuery.data || []} />
         </>
       ) : null}
     </section>

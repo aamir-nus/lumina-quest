@@ -2,7 +2,7 @@ import { memo, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
 import { GraphCanvas } from './GraphCanvas';
-import { starterGame } from '../constants/starterGame';
+import { GameEditor } from './GameEditor';
 import { UI } from '../constants/ui';
 
 /**
@@ -12,6 +12,13 @@ export const AdminPanel = memo(function AdminPanel({ me, onPlaytestSession }) {
   const queryClient = useQueryClient();
   const [selectedGameId, setSelectedGameId] = useState('');
   const [startSceneOverride, setStartSceneOverride] = useState('');
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editingGame, setEditingGame] = useState(null);
+
+  // Form state for game generation
+  const [gameTitle, setGameTitle] = useState('');
+  const [gameDescription, setGameDescription] = useState('');
+  const [gameStory, setGameStory] = useState('');
 
   const myGames = useQuery({
     queryKey: ['my-games'],
@@ -27,9 +34,19 @@ export const AdminPanel = memo(function AdminPanel({ me, onPlaytestSession }) {
     }
   }, [myGames.data, selectedGameId]);
 
-  const createMutation = useMutation({
-    mutationFn: async () => (await api.post('/games', starterGame)).data.game,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['my-games'] })
+  const generateMutation = useMutation({
+    mutationFn: async (data) => {
+      const response = await api.post('/games/generate', data);
+      return response.data.game;
+    },
+    onSuccess: (game) => {
+      queryClient.invalidateQueries({ queryKey: ['my-games'] });
+      setShowCreateForm(false);
+      setGameTitle('');
+      setGameDescription('');
+      setGameStory('');
+      setEditingGame(game);
+    }
   });
 
   const deleteMutation = useMutation({
@@ -38,6 +55,9 @@ export const AdminPanel = memo(function AdminPanel({ me, onPlaytestSession }) {
       queryClient.invalidateQueries({ queryKey: ['my-games'] });
       if (selectedGameId === deletedGameId) {
         setSelectedGameId('');
+      }
+      if (editingGame?._id === deletedGameId) {
+        setEditingGame(null);
       }
     }
   });
@@ -95,12 +115,95 @@ export const AdminPanel = memo(function AdminPanel({ me, onPlaytestSession }) {
     );
   }
 
+  // Show editor when editing a game
+  if (editingGame) {
+    return (
+      <GameEditor
+        game={editingGame}
+        onSave={(updatedGame) => {
+          setEditingGame(null);
+          setSelectedGameId(updatedGame._id);
+        }}
+        onCancel={() => setEditingGame(null)}
+      />
+    );
+  }
+
   return (
     <section className="card" aria-live="polite">
       <h2>Admin Forge</h2>
-      <button type="button" onClick={() => createMutation.mutate()} disabled={createMutation.isPending}>
-        {createMutation.isPending ? 'Creating...' : 'Create starter game'}
-      </button>
+
+      <div className="row">
+        <button type="button" onClick={() => setShowCreateForm(!showCreateForm)}>
+          {showCreateForm ? 'Cancel' : '+ Create New Game'}
+        </button>
+      </div>
+
+      {showCreateForm && (
+        <div className="subcard">
+          <h3>Generate Game with AI</h3>
+          <p className="muted">Describe your story and the AI will generate a complete game with scenes and choices.</p>
+
+          <div className="row">
+            <label htmlFor="game-title">Title</label>
+          </div>
+          <input
+            id="game-title"
+            value={gameTitle}
+            onChange={(e) => setGameTitle(e.target.value)}
+            placeholder="The Gate of Emberfall"
+          />
+
+          <div className="row">
+            <label htmlFor="game-description">Description (optional)</label>
+          </div>
+          <input
+            id="game-description"
+            value={gameDescription}
+            onChange={(e) => setGameDescription(e.target.value)}
+            placeholder="A compact adventure to validate the story engine"
+          />
+
+          <div className="row">
+            <label htmlFor="game-story">Story Flow</label>
+          </div>
+          <textarea
+            id="game-story"
+            value={gameStory}
+            onChange={(e) => setGameStory(e.target.value)}
+            rows={5}
+            placeholder="Player arrives at a guarded gate. They can reason with the guard or sneak through an alley. Inside the town, they hear alarm bells and see a relic chest. They must choose between helping civilians or looting the chest. The final scene reflects their choice."
+            style={{ width: '100%', marginBottom: '10px' }}
+          />
+
+          <div className="row">
+            <button
+              type="button"
+              onClick={() => generateMutation.mutate({ title: gameTitle, description: gameDescription, story: gameStory })}
+              disabled={generateMutation.isPending || !gameTitle || !gameStory}
+            >
+              {generateMutation.isPending ? 'Generating...' : 'Generate Game'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowCreateForm(false);
+                setGameTitle('');
+                setGameDescription('');
+                setGameStory('');
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+
+          {generateMutation.error && (
+            <p className="error" role="alert">
+              {generateMutation.error.response?.data?.error?.message || 'Failed to generate game'}
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="list">
         {(myGames.data || []).map((game) => (
@@ -110,7 +213,8 @@ export const AdminPanel = memo(function AdminPanel({ me, onPlaytestSession }) {
               <p className="muted">{game.status} | scenes: {game.scenes.length}</p>
             </div>
             <div className="row">
-              <button type="button" onClick={() => setSelectedGameId(game._id)} className={selectedGameId === game._id ? 'active' : ''}>Graph</button>
+              <button type="button" onClick={() => setSelectedGameId(game._id)} className={selectedGameId === game._id ? 'active' : ''}>View</button>
+              <button type="button" onClick={() => setEditingGame(game)}>Edit</button>
               <button type="button" onClick={() => publishMutation.mutate(game._id)} disabled={publishMutation.isPending || game.status === 'public'}>
                 {game.status === 'public' ? 'Published' : 'Publish'}
               </button>
@@ -131,46 +235,52 @@ export const AdminPanel = memo(function AdminPanel({ me, onPlaytestSession }) {
         ))}
       </div>
 
-      <div className="subcard">
-        <h3>Graph View</h3>
-        <GraphCanvas game={selectedGame} />
-      </div>
-
-      <div className="subcard">
-        <h3>Graph Analysis + Playtest</h3>
-        <div className="row">
-          <button
-            type="button"
-            onClick={() => selectedGame && analyzeMutation.mutate(selectedGame._id)}
-            disabled={analyzeMutation.isPending || !selectedGame}
-          >
-            {analyzeMutation.isPending ? 'Analyzing...' : 'Analyze Selected Game'}
-          </button>
-          <label htmlFor="playtest-scene" className="srOnly">Playtest start scene</label>
-          <input
-            id="playtest-scene"
-            value={startSceneOverride}
-            onChange={(e) => setStartSceneOverride(e.target.value)}
-            placeholder="Playtest start scene (optional)"
-            aria-label="Playtest start scene override"
-          />
-          <button
-            type="button"
-            onClick={() => selectedGame && playtestMutation.mutate({ gameId: selectedGame._id, startSceneId: startSceneOverride })}
-            disabled={!selectedGame || playtestMutation.isPending}
-          >
-            {playtestMutation.isPending ? 'Starting...' : 'Playtest'}
-          </button>
-        </div>
-        {analyzeMutation.data ? (
-          <div className="analysisBox">
-            <p><strong>Unreachable:</strong> {analyzeMutation.data.reachability.unreachableScenes.join(', ') || 'none'}</p>
-            <p><strong>Dead Ends:</strong> {analyzeMutation.data.reachability.deadEnds.join(', ') || 'none'}</p>
-            <p><strong>Point Range:</strong> {String(analyzeMutation.data.balance.minAchievablePoints)} to {String(analyzeMutation.data.balance.maxAchievablePoints)} (target {analyzeMutation.data.balance.targetPoints})</p>
-            <p><strong>Turn Range:</strong> {String(analyzeMutation.data.turnEconomy.minimumTurnsToEnding)} to {String(analyzeMutation.data.turnEconomy.maximumTurnsToEnding)}</p>
+      {selectedGame && (
+        <>
+          <div className="subcard">
+            <h3>Graph View: {selectedGame.title}</h3>
+            <div className="graphContainer">
+              <GraphCanvas game={selectedGame} />
+            </div>
           </div>
-        ) : null}
-      </div>
+
+          <div className="subcard">
+            <h3>Analysis + Playtest</h3>
+            <div className="row">
+              <button
+                type="button"
+                onClick={() => analyzeMutation.mutate(selectedGame._id)}
+                disabled={analyzeMutation.isPending}
+              >
+                {analyzeMutation.isPending ? 'Analyzing...' : 'Analyze Game'}
+              </button>
+              <label htmlFor="playtest-scene" className="srOnly">Playtest start scene</label>
+              <input
+                id="playtest-scene"
+                value={startSceneOverride}
+                onChange={(e) => setStartSceneOverride(e.target.value)}
+                placeholder="Playtest start scene (optional)"
+                aria-label="Playtest start scene override"
+              />
+              <button
+                type="button"
+                onClick={() => playtestMutation.mutate({ gameId: selectedGame._id, startSceneId: startSceneOverride })}
+                disabled={playtestMutation.isPending}
+              >
+                {playtestMutation.isPending ? 'Starting...' : 'Playtest'}
+              </button>
+            </div>
+            {analyzeMutation.data ? (
+              <div className="analysisBox">
+                <p><strong>Unreachable:</strong> {analyzeMutation.data.reachability.unreachableScenes.join(', ') || 'none'}</p>
+                <p><strong>Dead Ends:</strong> {analyzeMutation.data.reachability.deadEnds.join(', ') || 'none'}</p>
+                <p><strong>Point Range:</strong> {String(analyzeMutation.data.balance.minAchievablePoints)} to {String(analyzeMutation.data.balance.maxAchievablePoints)} (target {analyzeMutation.data.balance.targetPoints})</p>
+                <p><strong>Turn Range:</strong> {String(analyzeMutation.data.turnEconomy.minimumTurnsToEnding)} to {String(analyzeMutation.data.turnEconomy.maximumTurnsToEnding)}</p>
+              </div>
+            ) : null}
+          </div>
+        </>
+      )}
 
       <div className="subcard">
         <h3>Resolver Observability</h3>
@@ -190,20 +300,10 @@ export const AdminPanel = memo(function AdminPanel({ me, onPlaytestSession }) {
           </p>
         </div>
         <div className="metricsWidget">
-          <h4>Compute Approx (Current Provider)</h4>
+          <h4>Compute Approx</h4>
           <p className="muted">
             avg latency: {Number(observability.data?.metrics?.computeApprox?.avgLatencyMs || 0).toFixed(1)}ms |
-            avg cpu(user/sys): {Number(observability.data?.metrics?.computeApprox?.avgCpuUserMs || 0).toFixed(1)}/
-            {Number(observability.data?.metrics?.computeApprox?.avgCpuSystemMs || 0).toFixed(1)}ms
-          </p>
-          <p className="muted">
-            avg mem(rss/heap): {Number(observability.data?.metrics?.computeApprox?.avgRssMb || 0).toFixed(1)}/
-            {Number(observability.data?.metrics?.computeApprox?.avgHeapUsedMb || 0).toFixed(1)} MB
-          </p>
-          <p className="muted">
-            {observability.data?.provider === 'lmstudio'
-              ? 'On-device mode active: these values approximate local inference load.'
-              : 'External provider active: values reflect API call handling overhead.'}
+            avg cpu: {Number(observability.data?.metrics?.computeApprox?.avgCpuUserMs || 0).toFixed(1)}ms
           </p>
         </div>
       </div>

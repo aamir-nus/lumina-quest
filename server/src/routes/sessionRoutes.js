@@ -11,6 +11,9 @@ import {
   processSessionAction,
   startSessionForUser
 } from '../services/sessionEngineService.js';
+import { generateWizardDialogue } from '../services/llmResolver.js';
+import { PlayerSession } from '../models/PlayerSession.js';
+import { GameTemplate } from '../models/GameTemplate.js';
 
 const router = express.Router();
 
@@ -65,5 +68,48 @@ const actHandler = asyncHandler(async (req, res) => {
 });
 
 router.post('/action', llmActionRateLimiter, actHandler);
+
+router.post('/:sessionId/wizard-dialogue', asyncHandler(async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.sessionId)) {
+    throw new ApiError(400, 'INVALID_SESSION_ID', 'Invalid sessionId');
+  }
+
+  const session = await PlayerSession.findOne({ _id: req.params.sessionId, userId: req.user.id });
+  if (!session) throw new ApiError(404, 'SESSION_NOT_FOUND', 'Session not found');
+
+  if (session.status === 'active') {
+    throw new ApiError(400, 'SESSION_ACTIVE', 'Session must be completed to get ending dialogue');
+  }
+
+  const game = await GameTemplate.findById(session.gameId);
+  if (!game) throw new ApiError(404, 'GAME_NOT_FOUND', 'Game not found');
+
+  // Calculate grade
+  const score = session.stats.points;
+  const target = game.constraints.targetPoints;
+  let grade;
+  if (session.status === 'won' && score >= target + 3) grade = 'S';
+  else if (session.status === 'won' && score >= target) grade = 'A';
+  else if (session.status === 'won') grade = 'B';
+  else if (score >= target - 1) grade = 'C';
+  else grade = 'D';
+
+  const result = await generateWizardDialogue({
+    gameTitle: game.title,
+    grade,
+    points: session.stats.points,
+    targetPoints: game.constraints.targetPoints,
+    turnsUsed: session.stats.turnsUsed,
+    maxTurns: game.constraints.maxTurns,
+    status: session.status,
+    choices: session.history || []
+  });
+
+  return res.json({
+    dialogue: result.dialogue,
+    grade,
+    usage: result.usage
+  });
+}));
 
 export default router;
