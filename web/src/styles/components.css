@@ -275,6 +275,121 @@
   opacity: 0.5;
 }
 
+/* AI Option Generation Styles */
+.ai-btn {
+  background: linear-gradient(180deg, #b4d4e8, #9ac4d4);
+  color: #2b4a7f;
+  border-color: #7f9fc4;
+  margin-right: 8px;
+}
+
+.ai-btn:hover:not(:disabled) {
+  background: linear-gradient(180deg, #9ac4d4, #7fb4c4);
+  filter: saturate(120%);
+}
+
+.ai-btn:disabled {
+  opacity: 0.6;
+}
+
+.ai-option {
+  border-color: #7fb4c4;
+  background: linear-gradient(180deg, rgba(180, 212, 232, 0.15), rgba(154, 196, 212, 0.1));
+}
+
+.manual-option {
+  border-color: var(--line);
+}
+
+.origin-badge {
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ai-badge {
+  background: linear-gradient(180deg, #b4d4e8, #9ac4d4);
+  color: #2b4a7f;
+  border: 1px solid #7fb4c4;
+}
+
+.manual-badge {
+  background: linear-gradient(180deg, #e8d4b4, #d4c49a);
+  color: #7f5f2b;
+  border: 1px solid #c4af7f;
+}
+
+/* Engagement Messages */
+.engagement-message {
+  font-size: 14px;
+  color: var(--accent);
+  font-style: italic;
+  text-align: center;
+  padding: 8px;
+  background: rgba(63, 143, 123, 0.1);
+  border-radius: 8px;
+  border: 1px solid rgba(63, 143, 123, 0.3);
+  animation: pulse 2s ease-in-out infinite;
+  margin: 8px 0;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(0.98);
+  }
+}
+
+/* Form Layout Styles */
+.formRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 8px 0;
+  align-items: center;
+}
+
+.formRow label {
+  flex: 0 0 140px;
+  max-width: 140px;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: right;
+  padding-right: 8px;
+  margin: 0;
+}
+
+.formRow input,
+.formRow select,
+.formRow textarea {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+
+.formRow input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: auto;
+  margin: 0;
+}
+
+.formRowCompact label {
+  flex: 0 0 110px;
+  max-width: 110px;
+}
+
+.formRowHalf label {
+  flex: 0 0 50%;
+  max-width: 50%;
+}
+
 /* Wizard Bubble Styles */
 .wizardBubble {
   position: relative;

@@ -55,6 +55,9 @@ export function WizardBubble({ narrative, lastResolution }) {
                 <strong>Route: {lastResolution.type || 'avenue'}</strong>
                 <span className="confidence">{Number(lastResolution.confidence || 0).toFixed(2)}</span>
               </div>
+              {lastResolution.matchedBy ? (
+                <p className="debugProvider">Matched by: {lastResolution.matchedBy}</p>
+              ) : null}
               <p className="debugExplanation">{lastResolution.explanation}</p>
               {lastResolution.wildcardMode && (
                 <p className="debugWildcard">Wildcard: {lastResolution.wildcardMode}</p>

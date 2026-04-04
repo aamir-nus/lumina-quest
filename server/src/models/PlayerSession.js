@@ -6,6 +6,10 @@ const historyItemSchema = new mongoose.Schema(
     sceneId: String,
     userQuery: String,
     resolvedAvenueId: String,
+    matchedBy: String,
+    resolutionType: String,
+    destinationSceneId: String,
+    invalidAttemptCount: Number,
     narration: String,
     pointsDelta: Number
   },
@@ -23,10 +27,12 @@ const playerSessionSchema = new mongoose.Schema(
       startSceneOverride: { type: String, default: '' }
     },
     status: { type: String, enum: ['active', 'won', 'lost'], default: 'active' },
+    endReason: { type: String, default: '' },
     stats: {
       points: { type: Number, default: 0 },
       turnsUsed: { type: Number, default: 0 }
     },
+    invalidAttemptsByScene: { type: Map, of: Number, default: {} },
     visualState: {
       theme: { type: String, default: 'pastel' },
       activeLayers: { type: [String], default: [] },

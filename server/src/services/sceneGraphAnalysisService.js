@@ -1,4 +1,5 @@
 import { GAME } from '../constants/appConstants.js';
+import { normalizeGameTemplate } from './gameTemplateNormalizer.js';
 
 function bySceneId(game) {
   return Object.fromEntries((game.scenes || []).map((scene) => [scene.sceneId, scene]));
@@ -97,16 +98,22 @@ function calcPointBounds(game) {
  * Analyze reachability, point-balance, and turn economy of an authored game graph.
  */
 export function analyzeGameGraph(game) {
-  const allSceneIds = new Set((game.scenes || []).map((scene) => scene.sceneId));
-  const reachable = reachableFromStart(game);
+  const normalized = normalizeGameTemplate(game);
+  const allSceneIds = new Set((normalized.scenes || []).map((scene) => scene.sceneId));
+  const reachable = reachableFromStart(normalized);
   const unreachableScenes = [...allSceneIds].filter((id) => !reachable.has(id));
-  const deadEnds = (game.scenes || [])
+  const deadEnds = (normalized.scenes || [])
     .filter((scene) => !scene.isTerminal && (scene.avenues || []).length === 0)
     .map((scene) => scene.sceneId);
+  const endings = (normalized.scenes || []).filter((scene) => scene.kind === 'ending' || scene.isTerminal);
 
   return {
     reachability: { unreachableScenes, deadEnds },
-    balance: calcPointBounds(game),
-    turnEconomy: calcTurnEconomy(game)
+    balance: calcPointBounds(normalized),
+    turnEconomy: calcTurnEconomy(normalized),
+    endings: {
+      win: endings.filter((scene) => (scene.endingType || 'win') === 'win').map((scene) => scene.sceneId),
+      fail: endings.filter((scene) => scene.endingType === 'fail').map((scene) => scene.sceneId)
+    }
   };
 }

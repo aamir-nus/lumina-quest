@@ -1,9 +1,17 @@
 import { ApiError } from '../errors/ApiError.js';
 import { GameTemplate } from '../models/GameTemplate.js';
 import { PlayerSession } from '../models/PlayerSession.js';
-import { classifyRoute, generateNarration } from './llmResolver.js';
+import { generateNarration } from './llmResolver.js';
 import { evaluateWildcard } from './wildcardPolicyService.js';
 import { addSpan, endTrace, startTrace } from './traceService.js';
+import { normalizeGameTemplate } from './gameTemplateNormalizer.js';
+import { resolveSceneInput } from './sessionInputResolver.js';
+import {
+  applyInvalidAttempt,
+  buildDiegeticFailureMessage,
+  getInvalidAttemptState,
+  resetInvalidAttempts
+} from './sessionFailurePolicy.js';
 
 function baseVisualStateFromScene(scene) {
   const render = scene?.renderConfig || {};
@@ -71,13 +79,14 @@ async function saveSessionOrThrowConflict(session) {
  * Create a new player session from a published game template.
  */
 export async function startSessionForUser({ userId, gameId }) {
-  const game = await GameTemplate.findOne({ _id: gameId, status: 'public' });
-  if (!game) throw new ApiError(404, 'GAME_NOT_FOUND', 'Game not found or not public');
+  const gameDoc = await GameTemplate.findOne({ _id: gameId, status: 'public' });
+  if (!gameDoc) throw new ApiError(404, 'GAME_NOT_FOUND', 'Game not found or not public');
+  const game = normalizeGameTemplate(gameDoc);
   const startScene = game.scenes.find((scene) => scene.sceneId === game.startSceneId);
 
   const session = await PlayerSession.create({
     userId,
-    gameId: game._id,
+    gameId: gameDoc._id,
     currentSceneId: game.startSceneId,
     stats: { points: 0, turnsUsed: 0 },
     visualState: baseVisualStateFromScene(startScene),
@@ -94,7 +103,7 @@ export async function getSessionSnapshot({ userId, sessionId }) {
   const session = await PlayerSession.findOne({ _id: sessionId, userId }).lean();
   if (!session) throw new ApiError(404, 'SESSION_NOT_FOUND', 'Session not found');
 
-  const game = await GameTemplate.findById(session.gameId).lean();
+  const game = normalizeGameTemplate(await GameTemplate.findById(session.gameId).lean());
   const currentScene = game?.scenes?.find((scene) => scene.sceneId === session.currentSceneId) || null;
 
   return { session, game, currentScene };
@@ -150,6 +159,7 @@ async function resolveClarification({ session, game, currentScene, payload, clas
     currentScene,
     resolution: {
       type: 'clarification',
+      matchedBy: classified.matchedBy || 'none',
       selectedAvenueId: null,
       wildcardMode: null,
       confidence: classified.confidence || 0.4,
@@ -177,8 +187,9 @@ export async function processSessionAction({ userId, payload }) {
     throw new ApiError(409, 'SESSION_FINISHED', 'Session already finished', { status: session.status });
   }
 
-  const game = await GameTemplate.findById(session.gameId);
-  if (!game) throw new ApiError(404, 'GAME_NOT_FOUND', 'Game for session no longer exists');
+  const gameDoc = await GameTemplate.findById(session.gameId);
+  if (!gameDoc) throw new ApiError(404, 'GAME_NOT_FOUND', 'Game for session no longer exists');
+  const game = normalizeGameTemplate(gameDoc);
 
   console.log(`[GAME_ENGINE] 🎲 Game: ${game.title} | Turn: ${session.stats.turnsUsed + 1}`);
 
@@ -207,15 +218,60 @@ export async function processSessionAction({ userId, payload }) {
 
   console.log(`[GAME_ENGINE] 📍 Current Scene: ${currentScene.sceneId}`);
 
-  const classified = await classifyRoute({
-    gameTitle: game.title,
-    sceneNarrative: currentScene.narrative,
-    input: payload.userInput,
-    avenues: currentScene.avenues,
-    history: session.history,
-    wildcardEnabled: Boolean(game.wildcardConfig?.enabled)
+  const classified = await resolveSceneInput({
+    game,
+    currentScene,
+    sessionHistory: session.history,
+    userInput: payload.userInput
   });
   addSpan(traceId, 'classification', { routeType: classified.routeType, confidence: classified.confidence });
+
+  const isV2 = Number(game.schemaVersion || 1) >= 2;
+  if (isV2 && (classified.routeType === 'no_match' || classified.routeType === 'clarification')) {
+    const invalid = applyInvalidAttempt({ session, scene: currentScene });
+    const narration = buildDiegeticFailureMessage({ lost: invalid.lost, remaining: invalid.remaining });
+
+    session.stats.turnsUsed += 1;
+    session.history.push({
+      turn: session.stats.turnsUsed,
+      sceneId: currentScene.sceneId,
+      userQuery: payload.userInput,
+      resolvedAvenueId: null,
+      matchedBy: 'none',
+      resolutionType: 'invalid',
+      destinationSceneId: currentScene.sceneId,
+      invalidAttemptCount: invalid.nextCount,
+      narration,
+      pointsDelta: invalid.penalty
+    });
+
+    await saveSessionOrThrowConflict(session);
+    addSpan(traceId, 'invalid_attempt', invalid);
+    endTrace(traceId, { status: session.status, routeType: 'invalid' });
+
+    return {
+      session,
+      currentScene,
+      resolution: {
+        type: 'invalid',
+        matchedBy: 'none',
+        selectedAvenueId: null,
+        wildcardMode: null,
+        confidence: classified.confidence || 0,
+        explanation: classified.explanation || 'Input did not match any authored route.',
+        narration,
+        invalidAttemptsRemaining: invalid.remaining,
+        endReason: session.endReason || '',
+        providerResponse: classified.providerResponse,
+        llm: {
+          provider: classified.provider || 'unknown',
+          tokens: mergeUsage(classified.usage),
+          computeApprox: mergeCompute(classified.computeApprox)
+        },
+        traceId
+      }
+    };
+  }
 
   if (classified.routeType === 'clarification') {
     console.log('[GAME_ENGINE] ❓ Classification requested clarification');
@@ -260,10 +316,13 @@ export async function processSessionAction({ userId, payload }) {
     selectedAvenue =
       currentScene.avenues.find((avenue) => avenue.avenueId === classified.avenueId) || currentScene.avenues[0];
     destinationSceneId = selectedAvenue.nextSceneId;
-    pointsDelta = selectedAvenue.points;
+    pointsDelta = selectedAvenue.scoreImpact ?? selectedAvenue.points;
     explanation = classified.explanation || `Mapped to authored route ${selectedAvenue.label}`;
   }
 
+  if (isV2) {
+    resetInvalidAttempts(session, currentScene.sceneId);
+  }
   session.stats.points += pointsDelta;
   session.stats.turnsUsed += 1;
   session.currentSceneId = destinationSceneId;
@@ -286,6 +345,10 @@ export async function processSessionAction({ userId, payload }) {
     sceneId: currentScene.sceneId,
     userQuery: payload.userInput,
     resolvedAvenueId: selectedAvenue?.avenueId || null,
+    matchedBy: classified.matchedBy || (resolutionType === 'wildcard' ? 'wildcard' : 'llm'),
+    resolutionType,
+    destinationSceneId,
+    invalidAttemptCount: 0,
     narration: '',
     pointsDelta
   });
@@ -317,11 +380,18 @@ export async function processSessionAction({ userId, payload }) {
     currentScene: nextScene,
     resolution: {
       type: resolutionType,
+      matchedBy: classified.matchedBy || (resolutionType === 'wildcard' ? 'wildcard' : 'llm'),
       selectedAvenueId: selectedAvenue?.avenueId || null,
       wildcardMode,
       confidence: classified.confidence || 0.5,
       explanation,
       narration: narration.text,
+      invalidAttemptsRemaining: getInvalidAttemptState(
+        session,
+        currentScene.sceneId,
+        currentScene.inputPolicy?.invalidAttemptLimit ?? 3
+      ).remaining,
+      endReason: session.endReason || '',
       providerResponse: classified.providerResponse,
       llm: {
         provider: classified.provider || narration.provider || 'unknown',
