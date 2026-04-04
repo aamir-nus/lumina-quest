@@ -11,7 +11,9 @@ import {
 } from './resolverMetricsService.js';
 
 function getProviderConfig() {
+  console.log('[LLM_RESOLVER] 🔧 Getting provider config...');
   if (env.llmProvider === 'lmstudio') {
+    console.log(`[LLM_RESOLVER] ✅ Using LMStudio: ${env.lmStudioBaseUrl} | Model: ${env.lmStudioModel}`);
     return {
       provider: 'lmstudio',
       apiKey: env.lmStudioApiKey || 'lm-studio',
@@ -22,6 +24,7 @@ function getProviderConfig() {
     };
   }
 
+  console.log(`[LLM_RESOLVER] ✅ Using OpenRouter | Model: ${env.openRouterModel}`);
   return {
     provider: 'openrouter',
     apiKey: env.openRouterApiKey || 'missing-key',
@@ -168,11 +171,16 @@ function heuristicClassify({ input, avenues }) {
  * Classify player input into an authored avenue, bounded wildcard, or clarification.
  */
 export async function classifyRoute({ gameTitle, sceneNarrative, input, avenues, history, wildcardEnabled }) {
+  console.log('[LLM_CLASSIFY] 🎯 Starting classification...');
+  console.log(`[LLM_CLASSIFY] 📖 Input: "${input}"`);
+  console.log(`[LLM_CLASSIFY] 📍 Available avenues: ${avenues.map(a => a.label).join(', ')}`);
+
   const { provider, client } = createClient();
   const fallbackAvenue = avenues[0]?.avenueId || null;
   const heuristic = heuristicClassify({ input, avenues });
 
   if (!provider.hasApiKey) {
+    console.log('[LLM_CLASSIFY] ⚠️ No API key - using heuristic fallback');
     recordMockResponse();
     recordRouteType(heuristic.routeType);
     recordLlmUsage({ inputTokens: 0, outputTokens: 0, totalTokens: 0 });
@@ -185,6 +193,7 @@ export async function classifyRoute({ gameTitle, sceneNarrative, input, avenues,
     };
   }
 
+  console.log('[LLM_CLASSIFY] 🔄 Calling LLM provider...');
   const prompt = [
     `Game: ${gameTitle}`,
     `Scene: ${sceneNarrative}`,
@@ -198,6 +207,16 @@ export async function classifyRoute({ gameTitle, sceneNarrative, input, avenues,
     )}`,
     `Avenues: ${JSON.stringify(avenues.map((a) => ({ avenueId: a.avenueId, label: a.label, keywords: a.keywords })))}`,
     `Wildcard enabled: ${wildcardEnabled}`,
+    '',
+    'CONFIDENCE CALIBRATION GUIDELINES (use these as your reference):',
+    '• 0.9-1.0: ONLY for exact keyword/phrase matches (user says exact avenue label or keyword)',
+    '• 0.7-0.9: Strong semantic match (user clearly expresses intent matching an avenue)',
+    '• 0.5-0.7: Moderate confidence (user intent aligns but is vague or ambiguous)',
+    '• 0.3-0.5: Low confidence (input is unclear, needs clarification)',
+    '• 0.0-0.3: Very low confidence (completely unclear or contradictory)',
+    '',
+    'Be conservative with your confidence scores. When in doubt, choose a lower value.',
+    '',
     'Return strict JSON only with this shape:',
     '{"routeType":"avenue|wildcard|clarification","avenueId":"<id>|null","confidence":0-1,"explanation":"short","wildcard":{"mode":"high-reward|low-reward","destinationSceneId":"optional"}}',
     'Never invent avenue IDs.'
@@ -224,17 +243,27 @@ export async function classifyRoute({ gameTitle, sceneNarrative, input, avenues,
       ]
     });
 
+    console.log('[LLM_CLASSIFY] ✅ Got LLM response, parsing...');
     const parsed = parseOutput(response, heuristic);
     const usage = parseUsage(response);
     const computeApprox = captureComputeEnd(provider.provider, computeStart);
     recordLlmUsage(usage);
+
+    // DEBUG: Log what we actually got from the LLM
+    console.log('[LLM_CLASSIFY] 🔍 Raw parsed result:', JSON.stringify(parsed, null, 2));
+    console.log('[LLM_CLASSIFY] 🔍 Heuristic fallback would be:', JSON.stringify(heuristic, null, 2));
+
     const routeType = ['avenue', 'wildcard', 'clarification'].includes(parsed.routeType)
       ? parsed.routeType
       : heuristic.routeType;
     const validAvenue = avenues.some((a) => a.avenueId === parsed.avenueId);
     const avenueId = validAvenue ? parsed.avenueId : fallbackAvenue;
 
+    console.log(`[LLM_CLASSIFY] 📊 Result: routeType=${routeType}, avenueId=${avenueId}, confidence=${parsed.confidence || heuristic.confidence || 0.5}`);
+    console.log(`[LLM_CLASSIFY] ⏱️  Latency: ${computeApprox.latencyMs.toFixed(1)}ms | Tokens: ${usage.totalTokens}`);
+
     if (!validAvenue && routeType === 'avenue') {
+      console.log('[LLM_CLASSIFY] ⚠️ Invalid avenue ID, using fallback');
       recordFallback();
     }
     recordRouteType(routeType);
@@ -250,6 +279,7 @@ export async function classifyRoute({ gameTitle, sceneNarrative, input, avenues,
       providerResponse: response
     };
   } catch (error) {
+    console.log(`[LLM_CLASSIFY] ❌ Provider call failed: ${error.message}`);
     logger.error('Classifier provider call failed', { message: error.message });
     recordProviderError();
     recordMockResponse();
@@ -277,10 +307,14 @@ export async function generateNarration({
   routeLabel,
   tone = 'cinematic'
 }) {
+  console.log('[LLM_NARRATE] ✍️  Generating narration...');
+  console.log(`[LLM_NARRATE] 📝 Resolution: ${resolutionType} | Route: ${routeLabel || 'n/a'} | Tone: ${tone}`);
+
   const { provider, client } = createClient();
   const fallbackText = `Action resolved as ${resolutionType}${routeLabel ? ` (${routeLabel})` : ''}.`;
 
   if (!provider.hasApiKey) {
+    console.log('[LLM_NARRATE] ⚠️ No API key - using fallback');
     recordMockResponse();
     recordLlmUsage({ inputTokens: 0, outputTokens: 0, totalTokens: 0 });
     return {
@@ -303,6 +337,7 @@ export async function generateNarration({
   ].join('\n');
 
   try {
+    console.log('[LLM_NARRATE] 🔄 Calling LLM provider...');
     const computeStart = captureComputeStart();
     const response = await client.responses.create({
       model: provider.model,
@@ -318,10 +353,15 @@ export async function generateNarration({
       ]
     });
 
+    console.log('[LLM_NARRATE] ✅ Got LLM response, parsing...');
     const parsed = parseOutput(response, { text: fallbackText });
     const usage = parseUsage(response);
     const computeApprox = captureComputeEnd(provider.provider, computeStart);
     recordLlmUsage(usage);
+
+    console.log(`[LLM_NARRATE] 📖 Narration: "${parsed.text?.substring(0, 80)}..."`);
+    console.log(`[LLM_NARRATE] ⏱️  Latency: ${computeApprox.latencyMs.toFixed(1)}ms | Tokens: ${usage.totalTokens}`);
+
     return {
       text: parsed.text || fallbackText,
       provider: provider.provider,
@@ -330,6 +370,7 @@ export async function generateNarration({
       providerResponse: response
     };
   } catch (error) {
+    console.log(`[LLM_NARRATE] ❌ Provider call failed: ${error.message}`);
     logger.error('Narration provider call failed', { message: error.message });
     recordProviderError();
     recordMockResponse();
