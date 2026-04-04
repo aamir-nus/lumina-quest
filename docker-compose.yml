@@ -36,6 +36,8 @@ services:
       - LMSTUDIO_MODEL=${LMSTUDIO_MODEL:-google/gemma-3-4b}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - OPENROUTER_MODEL=${OPENROUTER_MODEL:-openrouter/free}
+      # Run smoke tests on startup (set to 'true' to enable)
+      - RUN_SMOKE_TESTS=${RUN_SMOKE_TESTS:-false}
     depends_on:
       mongo:
         condition: service_healthy
