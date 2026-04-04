@@ -24,7 +24,8 @@ export const env = {
   lmStudioModel: process.env.LMSTUDIO_MODEL || 'local-model',
   langfuseHost: process.env.LANGFUSE_HOST || '',
   langfusePublicKey: process.env.LANGFUSE_PUBLIC_KEY || '',
-  langfuseSecretKey: process.env.LANGFUSE_SECRET_KEY || ''
+  langfuseSecretKey: process.env.LANGFUSE_SECRET_KEY || '',
+  runSmokeTests: process.env.RUN_SMOKE_TESTS || 'false'
 };
 
 export function validateEnv() {
