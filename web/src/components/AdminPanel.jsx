@@ -1,10 +1,10 @@
 import { memo, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
-import { GraphCanvas } from './GraphCanvas';
 import { GameEditor } from './GameEditor';
 import { GameAuthorWizard } from './GameAuthorWizard';
 import { UI } from '../constants/ui';
+import '../styles/admin.css';
 
 /**
  * @param {{ me: { id?: string, email?: string, role?: string } | null, onPlaytestSession: (sessionId: string) => void }} props
@@ -127,23 +127,23 @@ export const AdminPanel = memo(function AdminPanel({ me, onPlaytestSession }) {
     <section className="card" aria-live="polite">
       <h2>Admin Forge</h2>
 
-      <div className="row">
+      <div className="row" style={{ justifyContent: 'center', marginBottom: '20px' }}>
         <button type="button" onClick={() => setShowCreateWizard(true)}>
           + Create New Game
         </button>
       </div>
 
-      <div className="list">
+      <div className="admin-games-grid">
         {(myGames.data || []).map((game) => (
-          <div key={game._id} className="listItem">
-            <div>
+          <div key={game._id} className="admin-game-card">
+            <div className="admin-game-header">
               <strong>{game.title}</strong>
               <p className="muted">
                 {game.status} | scenes: {game.scenes.length} | schema v{game.schemaVersion || 1}
                 {game.generationState?.status ? ` | ${game.generationState.status}` : ''}
               </p>
             </div>
-            <div className="row">
+            <div className="admin-game-actions">
               <button type="button" onClick={() => setSelectedGameId(game._id)} className={selectedGameId === game._id ? 'active' : ''}>View</button>
               <button type="button" onClick={() => setEditingGame(game)}>Edit</button>
               <button type="button" onClick={() => publishMutation.mutate(game._id)} disabled={publishMutation.isPending || game.status === 'public'}>
@@ -169,15 +169,8 @@ export const AdminPanel = memo(function AdminPanel({ me, onPlaytestSession }) {
       {selectedGame && (
         <>
           <div className="subcard">
-            <h3>Graph View: {selectedGame.title}</h3>
-            <div className="graphContainer">
-              <GraphCanvas game={selectedGame} />
-            </div>
-          </div>
-
-          <div className="subcard">
-            <h3>Analysis + Playtest</h3>
-            <div className="row">
+            <h3>Analysis + Playtest: {selectedGame.title}</h3>
+            <div className="admin-test-actions" style={{ justifyContent: 'center' }}>
               <button
                 type="button"
                 onClick={() => analyzeMutation.mutate(selectedGame._id)}
