@@ -85,6 +85,8 @@ export function PlayerPanel({ me, externalSessionId }) {
   const turnsRemaining = game ? Math.max(0, game.constraints.maxTurns - (session?.stats?.turnsUsed || 0)) : 0;
   const pointsToTarget = game ? Math.max(0, game.constraints.targetPoints - (session?.stats?.points || 0)) : 0;
   const transition = session?.visualState?.transition || lastResolution?.type || '';
+  const invalidLimit = scene?.inputPolicy?.invalidAttemptLimit || 3;
+  const invalidRemaining = lastResolution?.invalidAttemptsRemaining ?? invalidLimit;
 
   if (publicGames.isLoading) {
     return (
@@ -211,6 +213,16 @@ export function PlayerPanel({ me, externalSessionId }) {
                     {actionMutation.isPending ? '⏳' : 'Send'}
                   </button>
                 </div>
+
+                <p className="muted">
+                  Freeform attempts remaining on this beat: {invalidRemaining}. Turns left: {turnsRemaining}. Points to target: {pointsToTarget}.
+                </p>
+
+                {lastResolution?.type === 'invalid' ? (
+                  <p className="error" role="alert">
+                    {lastResolution.narration} Attempts remaining: {lastResolution.invalidAttemptsRemaining}.
+                  </p>
+                ) : null}
 
                 {actionMutation.error ? (
                   <p className="error" role="alert">

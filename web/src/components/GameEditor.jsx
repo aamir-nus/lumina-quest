@@ -1,20 +1,63 @@
-import { useState, useEffect } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMemo, useState, useEffect, useRef } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
+import { getRandomEngagementMessage } from '../utils/engagementMessages.js';
 
-const MAX_SCENES = 10;
-const MAX_AVENUES = 3;
+const MAX_AVENUES = 5;
 
-/**
- * @param {{ game: any, onSave: (game: any) => void, onCancel: () => void }} props
- */
+function cloneGame(game) {
+  return JSON.parse(JSON.stringify(game));
+}
+
+function expectedOptionRange(difficulty) {
+  if (difficulty === 'hard') return { min: 4, max: 6 };
+  if (difficulty === 'medium') return { min: 3, max: 5 };
+  return { min: 2, max: 3 };
+}
+
+function parseKeywordInput(value) {
+  return String(value || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 export function GameEditor({ game, onSave, onCancel }) {
-  const [editedGame, setEditedGame] = useState(() => JSON.parse(JSON.stringify(game)));
-  const [expandedScenes, setExpandedScenes] = useState(new Set([game.scenes[0]?.sceneId]));
-  // Local state for keyword inputs to preserve typing
+  const queryClient = useQueryClient();
+  const [editedGame, setEditedGame] = useState(() => cloneGame(game));
   const [keywordInputValues, setKeywordInputValues] = useState({});
+  const [generatingSceneId, setGeneratingSceneId] = useState(null);
+  const [generationError, setGenerationError] = useState(null);
+  const [engagementMessage, setEngagementMessage] = useState(null);
+  const messageIntervalRef = useRef(null);
+  const expectedRange = useMemo(
+    () => expectedOptionRange(editedGame.storyConfig?.difficulty),
+    [editedGame.storyConfig?.difficulty]
+  );
 
-  // Initialize keyword input values when game changes
+  // Engagement message cycle during scene option generation
+  useEffect(() => {
+    if (generatingSceneId) {
+      setEngagementMessage(getRandomEngagementMessage('option', editedGame.storyConfig?.difficulty));
+      messageIntervalRef.current = setInterval(() => {
+        setEngagementMessage(getRandomEngagementMessage('option', editedGame.storyConfig?.difficulty));
+      }, 3000);
+    } else {
+      if (messageIntervalRef.current) {
+        clearInterval(messageIntervalRef.current);
+        messageIntervalRef.current = null;
+      }
+      setEngagementMessage(null);
+    }
+
+    return () => {
+      if (messageIntervalRef.current) {
+        clearInterval(messageIntervalRef.current);
+      }
+    };
+  }, [generatingSceneId, editedGame.storyConfig?.difficulty]);
+
+  // Initialize keyword inputs when game changes
   useEffect(() => {
     const initialValues = {};
     editedGame.scenes?.forEach((scene) => {
@@ -24,51 +67,149 @@ export function GameEditor({ game, onSave, onCancel }) {
       });
     });
     setKeywordInputValues(initialValues);
-  }, [editedGame._id]); // Only re-init when game ID changes
+  }, [editedGame._id]);
 
   const updateMutation = useMutation({
-    mutationFn: async (updatedGame) => {
-      const { data } = await api.put(`/games/${updatedGame._id}`, updatedGame);
-      return data.game;
+    mutationFn: async (payload) => (await api.put(`/games/${payload._id}`, payload)).data.game,
+    onSuccess: (updatedGame) => onSave(updatedGame)
+  });
+
+  const generateSceneOptionsMutation = useMutation({
+    mutationFn: async (sceneId) => {
+      setGeneratingSceneId(sceneId);
+      setGenerationError(null);
+      const response = await api.post(`/games/${editedGame._id}/scenes/${sceneId}/generate-options`);
+      return response.data.game;
     },
     onSuccess: (updatedGame) => {
-      onSave(updatedGame);
+      setEditedGame(updatedGame);
+      setGeneratingSceneId(null);
+      setGenerationError(null);
+      // Invalidate queries to refresh game list if needed
+      queryClient.invalidateQueries({ queryKey: ['games'] });
+    },
+    onError: (error) => {
+      setGeneratingSceneId(null);
+      setGenerationError(error.response?.data?.error?.message || 'Failed to generate options. Please try again or add options manually.');
     }
   });
 
-  const toggleScene = (sceneId) => {
-    const next = new Set(expandedScenes);
-    if (next.has(sceneId)) {
-      next.delete(sceneId);
-    } else {
-      next.add(sceneId);
-    }
-    setExpandedScenes(next);
+  const updateGame = (updates) => {
+    setEditedGame((prev) => ({ ...prev, ...updates }));
+  };
+
+  const updateStoryConfig = (updates) => {
+    setEditedGame((prev) => ({
+      ...prev,
+      storyConfig: {
+        ...prev.storyConfig,
+        ...updates
+      }
+    }));
   };
 
   const updateScene = (sceneId, updates) => {
     setEditedGame((prev) => ({
       ...prev,
-      scenes: prev.scenes.map((s) =>
-        s.sceneId === sceneId ? { ...s, ...updates } : s
-      )
+      scenes: prev.scenes.map((scene) => (
+        scene.sceneId === sceneId
+          ? { ...scene, ...updates }
+          : scene
+      ))
+    }));
+  };
+
+  const updateScenePolicy = (sceneId, updates) => {
+    setEditedGame((prev) => ({
+      ...prev,
+      scenes: prev.scenes.map((scene) => (
+        scene.sceneId === sceneId
+          ? {
+              ...scene,
+              inputPolicy: {
+                ...scene.inputPolicy,
+                ...updates
+              }
+            }
+          : scene
+      ))
     }));
   };
 
   const updateAvenue = (sceneId, avenueId, updates) => {
     setEditedGame((prev) => ({
       ...prev,
-      scenes: prev.scenes.map((s) =>
-        s.sceneId === sceneId
+      scenes: prev.scenes.map((scene) => (
+        scene.sceneId === sceneId
           ? {
-              ...s,
-              avenues: s.avenues.map((a) =>
-                a.avenueId === avenueId ? { ...a, ...updates } : a
-              )
+              ...scene,
+              avenues: scene.avenues.map((avenue) => (
+                avenue.avenueId === avenueId
+                  ? {
+                      ...avenue,
+                      ...updates
+                    }
+                  : avenue
+              ))
             }
-          : s
-      )
+          : scene
+      ))
     }));
+  };
+
+  const addAvenue = (sceneId) => {
+    setEditedGame((prev) => ({
+      ...prev,
+      scenes: prev.scenes.map((scene) => {
+        if (scene.sceneId !== sceneId || scene.avenues.length >= MAX_AVENUES) {
+          return scene;
+        }
+        const nextSceneId = prev.scenes.find((item) => item.sceneId !== sceneId)?.sceneId || scene.sceneId;
+        return {
+          ...scene,
+          avenues: [
+            ...scene.avenues,
+            {
+              avenueId: `${sceneId}_manual_${scene.avenues.length + 1}`,
+              label: 'New option',
+              intent: 'New option',
+              outcome: 'partial',
+              keywords: [],
+              scoreImpact: 0,
+              points: 0,
+              nextSceneId,
+              origin: 'manual',
+              visualEffects: {
+                transition: 'fade',
+                spriteMood: '',
+                setTheme: '',
+                enableLayers: [],
+                disableLayers: []
+              }
+            }
+          ]
+        };
+      })
+    }));
+  };
+
+  const removeAvenue = (sceneId, avenueId) => {
+    setEditedGame((prev) => ({
+      ...prev,
+      scenes: prev.scenes.map((scene) => (
+        scene.sceneId === sceneId
+          ? { ...scene, avenues: scene.avenues.filter((avenue) => avenue.avenueId !== avenueId) }
+          : scene
+      ))
+    }));
+
+    // Clean up keyword input state
+    const key = `${sceneId}-${avenueId}`;
+    setKeywordInputValues((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
   };
 
   // Handle keyword input changes - only update local state while typing
@@ -84,82 +225,8 @@ export function GameEditor({ game, onSave, onCancel }) {
   const handleKeywordInputBlur = (sceneId, avenueId) => {
     const key = `${sceneId}-${avenueId}`;
     const inputValue = keywordInputValues[key] || '';
-    const keywords = inputValue
-      .split(',')
-      .map(k => k.trim())
-      .filter(k => k.length > 0);
-
+    const keywords = parseKeywordInput(inputValue);
     updateAvenue(sceneId, avenueId, { keywords });
-  };
-
-  const addAvenue = (sceneId) => {
-    const scene = editedGame.scenes.find((s) => s.sceneId === sceneId);
-    if (scene.avenues.length >= MAX_AVENUES) return;
-
-    const newAvenueId = `a_${Date.now()}`;
-    const newKey = `${sceneId}-${newAvenueId}`;
-
-    updateScene(sceneId, {
-      avenues: [
-        ...scene.avenues,
-        {
-          avenueId: newAvenueId,
-          label: 'New option',
-          keywords: [],
-          points: 1,
-          nextSceneId: editedGame.scenes[editedGame.scenes.length - 1]?.sceneId || '',
-          visualEffects: {
-            transition: 'fade',
-            spriteMood: 'neutral',
-            setTheme: '',
-            enableLayers: [],
-            disableLayers: []
-          }
-        }
-      ]
-    });
-
-    // Initialize the new input
-    setKeywordInputValues((prev) => ({
-      ...prev,
-      [newKey]: ''
-    }));
-  };
-
-  const removeAvenue = (sceneId, avenueId) => {
-    const scene = editedGame.scenes.find((s) => s.sceneId === sceneId);
-    if (scene.avenues.length <= 2) return; // Keep minimum 2 options
-
-    const key = `${sceneId}-${avenueId}`;
-    updateScene(sceneId, {
-      avenues: scene.avenues.filter((a) => a.avenueId !== avenueId)
-    });
-
-    // Clean up the input state
-    setKeywordInputValues((prev) => {
-      const next = { ...prev };
-      delete next[key];
-      return next;
-    });
-  };
-
-  const handleSave = () => {
-    // Commit any pending keyword changes before saving
-    editedGame.scenes?.forEach((scene) => {
-      scene.avenues?.forEach((avenue) => {
-        const key = `${scene.sceneId}-${avenue.avenueId}`;
-        const inputValue = keywordInputValues[key];
-        if (inputValue !== undefined) {
-          const keywords = inputValue
-            .split(',')
-            .map(k => k.trim())
-            .filter(k => k.length > 0);
-          avenue.keywords = keywords;
-        }
-      });
-    });
-
-    updateMutation.mutate(editedGame);
   };
 
   const getKeywordInputValue = (sceneId, avenueId, avenueKeywords) => {
@@ -171,133 +238,274 @@ export function GameEditor({ game, onSave, onCancel }) {
     return Array.isArray(avenueKeywords) ? avenueKeywords.join(', ') : '';
   };
 
+  const handleSave = () => {
+    // Commit any pending keyword changes before saving
+    const updatedGame = { ...editedGame };
+    updatedGame.scenes = updatedGame.scenes.map((scene) => ({
+      ...scene,
+      avenues: (scene.avenues || []).map((avenue) => {
+        const key = `${scene.sceneId}-${avenue.avenueId}`;
+        const inputValue = keywordInputValues[key];
+        if (inputValue !== undefined) {
+          return {
+            ...avenue,
+            keywords: parseKeywordInput(inputValue)
+          };
+        }
+        return avenue;
+      })
+    }));
+    updateMutation.mutate(updatedGame);
+  };
+
   return (
-    <div className="subcard">
+    <section className="card">
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3>Edit: {editedGame.title}</h3>
-        <div className="row" style={{ gap: '8px' }}>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={updateMutation.isPending}
-          >
-            {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+        <h2>Game Editor</h2>
+        <div className="row">
+          <button type="button" onClick={handleSave} disabled={updateMutation.isPending}>
+            {updateMutation.isPending ? 'Saving...' : 'Save Draft'}
           </button>
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={updateMutation.isPending}
-          >
-            Cancel
-          </button>
+          <button type="button" onClick={onCancel} disabled={updateMutation.isPending}>Close</button>
         </div>
       </div>
 
+      <div className="subcard">
+        <div className="formRow">
+          <label htmlFor="edit-title">Title</label>
+          <input id="edit-title" value={editedGame.title} onChange={(event) => updateGame({ title: event.target.value })} />
+        </div>
+
+        <div className="formRow">
+          <label htmlFor="edit-description">Description</label>
+          <textarea
+            id="edit-description"
+            rows={2}
+            value={editedGame.description || ''}
+            onChange={(event) => updateGame({ description: event.target.value })}
+          />
+        </div>
+
+        <div className="formRow">
+          <label htmlFor="edit-premise">Premise</label>
+          <textarea
+            id="edit-premise"
+            rows={2}
+            value={editedGame.storyConfig?.premise || ''}
+            onChange={(event) => updateStoryConfig({ premise: event.target.value })}
+          />
+        </div>
+
+        <div className="formRow">
+          <label htmlFor="edit-start-goal">Start Goal</label>
+          <input
+            id="edit-start-goal"
+            value={editedGame.storyConfig?.startGoal || ''}
+            onChange={(event) => updateStoryConfig({ startGoal: event.target.value })}
+          />
+        </div>
+
+        <div className="formRow">
+          <label htmlFor="edit-end-goal">End Goal</label>
+          <input
+            id="edit-end-goal"
+            value={editedGame.storyConfig?.endGoal || ''}
+            onChange={(event) => updateStoryConfig({ endGoal: event.target.value })}
+          />
+        </div>
+
+        <div className="formRow">
+          <label htmlFor="edit-tone">Tone</label>
+          <input
+            id="edit-tone"
+            value={editedGame.storyConfig?.tone || 'cinematic'}
+            onChange={(event) => updateStoryConfig({ tone: event.target.value })}
+          />
+        </div>
+
+        <div className="formRow">
+          <label htmlFor="edit-difficulty">Difficulty</label>
+          <select
+            id="edit-difficulty"
+            value={editedGame.storyConfig?.difficulty || 'easy'}
+            onChange={(event) => updateStoryConfig({ difficulty: event.target.value })}
+          >
+            <option value="easy">easy</option>
+            <option value="medium">medium</option>
+            <option value="hard">hard</option>
+          </select>
+        </div>
+
+        <p className="muted">
+          Expected authored options per playable scene: {expectedRange.min}-{expectedRange.max}. Pending option scenes:{' '}
+          {(editedGame.generationState?.pendingSceneIds || []).join(', ') || 'none'}.
+        </p>
+      </div>
+
       <div className="list">
-        {editedGame.scenes.map((scene, idx) => (
-          <div key={scene.sceneId} className="card">
-            <div className="row" onClick={() => toggleScene(scene.sceneId)} style={{ cursor: 'pointer' }}>
-              <strong>{idx + 1}. {scene.sceneId}</strong>
-              <span className="muted">{scene.isTerminal ? '[END]' : '[SCENE]'}</span>
-              <button type="button" onClick={() => toggleScene(scene.sceneId)}>
-                {expandedScenes.has(scene.sceneId) ? '▼' : '▶'}
-              </button>
+        {editedGame.scenes.map((scene) => (
+          <div key={scene.sceneId} className="subcard">
+            <div className="row" style={{ justifyContent: 'space-between' }}>
+              <strong>{scene.sceneId}</strong>
+              <span className="muted">{scene.kind}{scene.endingType ? `/${scene.endingType}` : ''}</span>
             </div>
 
-            {expandedScenes.has(scene.sceneId) && (
-              <>
-                <div className="row">
-                  <label htmlFor={`narrative-${scene.sceneId}`}>Narrative</label>
-                </div>
-                <textarea
-                  id={`narrative-${scene.sceneId}`}
-                  value={scene.narrative}
-                  onChange={(e) => updateScene(scene.sceneId, { narrative: e.target.value })}
-                  rows={3}
-                  style={{ width: '100%', marginBottom: '10px' }}
-                />
+            <div className="formRow">
+              <label htmlFor={`${scene.sceneId}-goal`}>Goal Summary</label>
+              <input
+                id={`${scene.sceneId}-goal`}
+                value={scene.goalSummary || ''}
+                onChange={(event) => updateScene(scene.sceneId, { goalSummary: event.target.value })}
+              />
+            </div>
 
-                <div className="row">
-                  <label htmlFor={`isTerminal-${scene.sceneId}`}>Terminal Scene?</label>
+            <div className="formRow">
+              <label htmlFor={`${scene.sceneId}-narrative`}>Narrative</label>
+              <textarea
+                id={`${scene.sceneId}-narrative`}
+                rows={2}
+                value={scene.narrative}
+                onChange={(event) => updateScene(scene.sceneId, { narrative: event.target.value })}
+              />
+            </div>
+
+            {scene.kind !== 'ending' && (
+              <>
+                <div className="formRow">
+                  <label htmlFor={`${scene.sceneId}-freeform`}>Allow Freeform</label>
                   <input
-                    id={`isTerminal-${scene.sceneId}`}
+                    id={`${scene.sceneId}-freeform`}
                     type="checkbox"
-                    checked={scene.isTerminal}
-                    onChange={(e) => updateScene(scene.sceneId, { isTerminal: e.target.checked })}
+                    checked={scene.inputPolicy?.allowFreeform ?? true}
+                    onChange={(event) => updateScenePolicy(scene.sceneId, { allowFreeform: event.target.checked })}
                   />
                 </div>
 
-                {!scene.isTerminal && (
-                  <>
-                    <div className="row" style={{ justifyContent: 'space-between' }}>
-                      <strong>Options ({scene.avenues.length}/{MAX_AVENUES})</strong>
-                      {scene.avenues.length < MAX_AVENUES && (
-                        <button type="button" onClick={() => addAvenue(scene.sceneId)}>+ Add Option</button>
-                      )}
+                <div className="formRow">
+                  <label htmlFor={`${scene.sceneId}-limit`}>Invalid Limit</label>
+                  <input
+                    id={`${scene.sceneId}-limit`}
+                    type="number"
+                    value={scene.inputPolicy?.invalidAttemptLimit ?? 3}
+                    onChange={(event) => updateScenePolicy(scene.sceneId, { invalidAttemptLimit: Number(event.target.value) })}
+                  />
+                </div>
+
+                <div className="formRow">
+                  <label htmlFor={`${scene.sceneId}-penalty`}>Invalid Penalty</label>
+                  <input
+                    id={`${scene.sceneId}-penalty`}
+                    type="number"
+                    value={scene.inputPolicy?.invalidPenalty ?? -1}
+                    onChange={(event) => updateScenePolicy(scene.sceneId, { invalidPenalty: Number(event.target.value) })}
+                  />
+                </div>
+
+                <div className="row" style={{ justifyContent: 'space-between', marginTop: '12px' }}>
+                  <strong>Options ({scene.avenues.length}/{MAX_AVENUES})</strong>
+                  <div className="row">
+                    <button
+                      type="button"
+                      onClick={() => generateSceneOptionsMutation.mutate(scene.sceneId)}
+                      disabled={generatingSceneId === scene.sceneId || scene.avenues.length >= MAX_AVENUES}
+                      className="ai-btn"
+                    >
+                      {generatingSceneId === scene.sceneId ? 'AI Generating...' : 'AI: Generate Options'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => addAvenue(scene.sceneId)}
+                      disabled={scene.avenues.length >= MAX_AVENUES}
+                    >
+                      + Add Option
+                    </button>
+                  </div>
+                </div>
+
+                {generatingSceneId === scene.sceneId && engagementMessage && (
+                  <p className="engagement-message" role="status" aria-live="polite">
+                    ✨ {engagementMessage}
+                  </p>
+                )}
+
+                {(scene.avenues || []).map((avenue) => (
+                  <div key={avenue.avenueId} className={`card ${avenue.origin === 'ai_generated' ? 'ai-option' : 'manual-option'}`}>
+                    <div className="row" style={{ justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <span className={`origin-badge ${avenue.origin === 'ai_generated' ? 'ai-badge' : 'manual-badge'}`}>
+                        {avenue.origin === 'ai_generated' ? 'AI Generated' : 'Manual'}
+                      </span>
+                    </div>
+                    <div className="formRow">
+                      <label>Label</label>
+                      <input
+                        value={avenue.label}
+                        onChange={(event) => updateAvenue(scene.sceneId, avenue.avenueId, { label: event.target.value })}
+                        placeholder="Option label"
+                      />
                     </div>
 
-                    {scene.avenues.map((avenue) => {
-                      const inputKey = `${scene.sceneId}-${avenue.avenueId}`;
-                      const currentInputValue = getKeywordInputValue(scene.sceneId, avenue.avenueId, avenue.keywords);
-                      const keywordCount = currentInputValue
-                        .split(',')
-                        .map(k => k.trim())
-                        .filter(k => k.length > 0).length;
+                    <div className="formRow">
+                      <label>Outcome</label>
+                      <select
+                        value={avenue.outcome || 'partial'}
+                        onChange={(event) => updateAvenue(scene.sceneId, avenue.avenueId, { outcome: event.target.value })}
+                      >
+                        <option value="success">success</option>
+                        <option value="partial">partial</option>
+                        <option value="fail">fail</option>
+                      </select>
+                    </div>
 
-                      return (
-                        <div key={avenue.avenueId} className="subcard">
-                          <div className="row">
-                            <input
-                              value={avenue.label}
-                              onChange={(e) => updateAvenue(scene.sceneId, avenue.avenueId, { label: e.target.value })}
-                              placeholder="Option label"
-                              style={{ flex: 1 }}
-                            />
-                            <input
-                              type="number"
-                              value={avenue.points}
-                              onChange={(e) => updateAvenue(scene.sceneId, avenue.avenueId, { points: Number(e.target.value) })}
-                              placeholder="Points"
-                              style={{ width: '70px' }}
-                            />
-                            {scene.avenues.length > 2 && (
-                              <button
-                                type="button"
-                                onClick={() => removeAvenue(scene.sceneId, avenue.avenueId)}
-                                className="delete-btn"
-                              >
-                                ×
-                              </button>
-                            )}
-                          </div>
-                          <div className="row">
-                            <input
-                              value={currentInputValue}
-                              onChange={(e) => handleKeywordInputChange(scene.sceneId, avenue.avenueId, e.target.value)}
-                              onBlur={() => handleKeywordInputBlur(scene.sceneId, avenue.avenueId)}
-                              placeholder="Keywords (comma separated: sword, magic, shield)"
-                              style={{ flex: 1 }}
-                            />
-                            <span className="keywordCount">
-                              {keywordCount} keyword{keywordCount !== 1 ? 's' : ''}
-                            </span>
-                          </div>
-                          <div className="row">
-                            <label>Next Scene:</label>
-                            <select
-                              value={avenue.nextSceneId}
-                              onChange={(e) => updateAvenue(scene.sceneId, avenue.avenueId, { nextSceneId: e.target.value })}
-                            >
-                              {editedGame.scenes.map((s) => (
-                                <option key={s.sceneId} value={s.sceneId}>{s.sceneId}</option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </>
-                )}
+                    <div className="formRow">
+                      <label>Score Impact</label>
+                      <input
+                        type="number"
+                        value={avenue.scoreImpact ?? avenue.points ?? 0}
+                        onChange={(event) => updateAvenue(scene.sceneId, avenue.avenueId, {
+                          scoreImpact: Number(event.target.value),
+                          points: Number(event.target.value)
+                        })}
+                      />
+                    </div>
+
+                    <div className="formRow">
+                      <label>Intent</label>
+                      <input
+                        value={avenue.intent || ''}
+                        onChange={(event) => updateAvenue(scene.sceneId, avenue.avenueId, { intent: event.target.value })}
+                        placeholder="What this option represents"
+                      />
+                    </div>
+
+                    <div className="formRow">
+                      <label>Keywords</label>
+                      <input
+                        value={getKeywordInputValue(scene.sceneId, avenue.avenueId, avenue.keywords)}
+                        onChange={(event) => handleKeywordInputChange(scene.sceneId, avenue.avenueId, event.target.value)}
+                        onBlur={() => handleKeywordInputBlur(scene.sceneId, avenue.avenueId)}
+                        placeholder="sword, magic, shield"
+                      />
+                    </div>
+
+                    <div className="formRow">
+                      <label>Next Scene</label>
+                      <select
+                        value={avenue.nextSceneId}
+                        onChange={(event) => updateAvenue(scene.sceneId, avenue.avenueId, { nextSceneId: event.target.value })}
+                      >
+                        {editedGame.scenes.map((s) => (
+                          <option key={s.sceneId} value={s.sceneId}>{s.sceneId}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="row" style={{ justifyContent: 'flex-end' }}>
+                      <button type="button" onClick={() => removeAvenue(scene.sceneId, avenue.avenueId)} className="delete-btn">
+                        Remove Option
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </>
             )}
           </div>
@@ -309,6 +517,11 @@ export function GameEditor({ game, onSave, onCancel }) {
           {updateMutation.error.response?.data?.error?.message || 'Failed to save game'}
         </p>
       )}
-    </div>
+      {generationError && (
+        <p className="error" role="alert">
+          {generationError}
+        </p>
+      )}
+    </section>
   );
 }
