@@ -22,17 +22,96 @@ flowchart LR
 - **Visual State**: 8-bit styled presentation with layered components, transitions, and endings
 - **Observability**: Token usage tracking, compute metrics, and request tracing
 - **Security**: Cookie-first auth, optimistic concurrency, transaction wrapping, and structured errors
+- **Docker Support**: Single-command startup with full stack containerization
 
 ## Quick Start
 
-1. `npm install`
-2. `cp .env.example .env`
-3. Set `JWT_SECRET` (24+ chars)
-4. Optional CORS strictness:
-   - `CLIENT_ORIGIN=http://localhost:5173`
-   - `CORS_ALLOW_NO_ORIGIN=false`
-5. `npm run mongo:up`
-6. `npm run dev`
+### Option 1: Docker Compose (Recommended)
+
+```bash
+# Start everything
+docker compose up -d
+
+# View logs
+docker compose logs -f
+
+# Stop everything
+docker compose down
+```
+
+Access the application at **http://localhost:8080**
+
+**Default Admin Credentials:**
+
+- Username: `admin`
+- Password: `admin`
+
+### Option 2: Development Mode
+
+```bash
+# Install dependencies
+npm install
+
+# Start MongoDB (requires Docker)
+docker compose up -d mongo
+
+# Set up environment
+cp .env.example .env
+# Edit .env and set JWT_SECRET (24+ characters)
+
+# Start server and web in separate terminals
+npm run dev:server
+npm run dev:web
+```
+
+Access the application at **http://localhost:5173`
+
+## Configuration
+
+### Required Environment Variables
+
+```bash
+# Server
+PORT=4000
+NODE_ENV=production
+
+# Database
+MONGO_URI=mongodb://mongo:27017/luminaquest
+
+# Authentication
+JWT_SECRET=your-secret-key-min-24-chars
+
+# CORS
+CLIENT_ORIGIN=http://localhost:8080
+CORS_ALLOW_NO_ORIGIN=false
+```
+
+### LLM Provider Configuration
+
+```bash
+# LMStudio (Local Inference - Recommended for dev)
+LLM_PROVIDER=lmstudio
+LMSTUDIO_BASE_URL=http://127.0.0.1:1234/v1
+LMSTUDIO_API_KEY=lm-studio
+LMSTUDIO_MODEL=google/gemma-3-4b
+```
+
+```bash
+# OpenRouter (External API - Good for production)
+LLM_PROVIDER=openrouter
+OPENROUTER_API_KEY=sk-or-v1-xxxxx
+OPENROUTER_MODEL=openrouter/free
+```
+
+For Docker Compose, create a `.env` file in the project root:
+
+```bash
+# .env file for docker compose
+JWT_SECRET=your-production-secret-key-min-24-chars
+LLM_PROVIDER=lmstudio
+LMSTUDIO_BASE_URL=http://host.docker.internal:1234/v1
+LMSTUDIO_MODEL=google/gemma-3-4b
+```
 
 ## Auth + API Notes
 
@@ -40,25 +119,43 @@ flowchart LR
 - Frontend API client uses `withCredentials: true`.
 - Canonical action endpoint is `POST /api/sessions/action`.
 - Every API response includes `x-request-id` for tracing failures.
-- Frontend API base URL is configurable via `VITE_API_BASE_URL`.
+- Default admin user is automatically created on first startup.
 
-## LLM Provider Switch
+## Admin Guide
 
-- `LLM_PROVIDER=openrouter`
-- `LLM_PROVIDER=lmstudio`
+See [for-admin.md](./for-admin.md) for complete admin documentation including:
 
-## Docker (Lightweight, Multi-Arch)
-
-```bash
-# linux x64
-docker buildx build --platform linux/amd64 -f server/Dockerfile -t luminaquest-server:amd64 .
-docker buildx build --platform linux/amd64 -f web/Dockerfile -t luminaquest-web:amd64 .
-
-# arm64 (Apple Silicon + Linux ARM)
-docker buildx build --platform linux/arm64 -f server/Dockerfile -t luminaquest-server:arm64 .
-docker buildx build --platform linux/arm64 -f web/Dockerfile -t luminaquest-web:arm64 .
-```
+- Game creation and management
+- LLM provider configuration
+- Troubleshooting common issues
 
 ## Documentation
 
 - [API Reference](docs/API.md) - Complete API contract and endpoint documentation
+- [UI Mockups](docs/UI_MOCKUPS.md) - Mermaid diagrams of workflows and architecture
+
+---
+
+## Development
+
+### Running Tests
+
+```bash
+# Backend tests
+npm run test:server
+
+# Backend smoke test
+node server/smoke-test.js
+```
+
+## Docker Multi-Arch Builds
+
+```bash
+# Linux AMD64
+docker buildx build --platform linux/amd64 -f server/Dockerfile -t luminaquest-server:amd64 .
+docker buildx build --platform linux/amd64 -f web/Dockerfile -t luminaquest-web:amd64 .
+
+# ARM64 (Apple Silicon)
+docker buildx build --platform linux/arm64 -f server/Dockerfile -t luminaquest-server:arm64 .
+docker buildx build --platform linux/arm64 -f web/Dockerfile -t luminaquest-web:arm64 .
+```

@@ -13,8 +13,56 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - luminaquest-network
+
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    container_name: luminaquest-server
+    ports:
+      - "4000:4000"
+    environment:
+      - PORT=4000
+      - NODE_ENV=production
+      - MONGO_URI=mongodb://mongo:27017/luminaquest
+      - JWT_SECRET=${JWT_SECRET:-luminaquest-jwt-secret-min-24-chars-required-for-production-use}
+      - CLIENT_ORIGIN=http://localhost:8080
+      - CORS_ALLOW_NO_ORIGIN=false
+      - LLM_PROVIDER=${LLM_PROVIDER:-lmstudio}
+      - LMSTUDIO_BASE_URL=${LMSTUDIO_BASE_URL:-http://host.docker.internal:1234/v1}
+      - LMSTUDIO_API_KEY=${LMSTUDIO_API_KEY:-lm-studio}
+      - LMSTUDIO_MODEL=${LMSTUDIO_MODEL:-google/gemma-3-4b}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-openrouter/free}
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - luminaquest-network
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+      args:
+        - VITE_API_BASE_URL=http://localhost:4000/api
+    container_name: luminaquest-web
+    ports:
+      - "8080:80"
+    depends_on:
+      - server
+    networks:
+      - luminaquest-network
+    restart: unless-stopped
 
 # Named volume persists data across docker compose down/up
 # Only deleted with: docker volume rm mongo_data or docker compose down -v
 volumes:
   mongo_data:
+
+networks:
+  luminaquest-network:
+    driver: bridge
