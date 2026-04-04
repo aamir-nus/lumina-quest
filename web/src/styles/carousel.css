@@ -237,10 +237,10 @@
 /* Delete Button - Positioned in visual area */
 .avenue-delete-btn {
   position: absolute;
-  top: 8px;
-  left: 8px;
-  width: 36px;
-  height: 36px;
+  top: 12px;
+  left: 12px;
+  width: 32px;
+  height: 32px;
   border-radius: 8px;
   border: none;
   background: rgba(255, 255, 255, 0.95);
@@ -250,7 +250,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: 16px;
   transition: all 200ms ease;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
@@ -271,21 +271,20 @@
   position: relative;
   overflow: hidden;
   border-right: 2px solid var(--line);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 50px 8px 8px 50px;
 }
 
 .avenue-icon {
-  font-size: 48px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 40px;
 }
 
 .avenue-origin-badge {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 12px;
+  right: 12px;
   padding: 3px 8px;
   font-size: 8px;
   border-radius: 4px;
@@ -307,8 +306,8 @@
 
 .avenue-id-overlay {
   position: absolute;
-  bottom: 8px;
-  left: 8px;
+  bottom: 12px;
+  left: 12px;
   background: rgba(31, 47, 56, 0.75);
   color: #d4a84b;
   padding: 3px 6px;
@@ -319,8 +318,8 @@
 
 .avenue-outcome-indicator {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  bottom: 12px;
+  right: 12px;
   width: 24px;
   height: 24px;
   border-radius: 50%;
