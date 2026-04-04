@@ -166,10 +166,11 @@ async function resolveClarification({ session, game, currentScene, payload, clas
   };
 }
 
-/**
- * Process one player action and persist deterministic game state changes.
- */
+/* process one player action and persist deterministic game state changes. */
 export async function processSessionAction({ userId, payload }) {
+  console.log('\n[GAME_ENGINE] 🎮 Processing action...');
+  console.log(`[GAME_ENGINE] 👤 User Input: "${payload.userInput}"`);
+
   const session = await PlayerSession.findOne({ _id: payload.sessionId, userId });
   if (!session) throw new ApiError(404, 'SESSION_NOT_FOUND', 'Session not found');
   if (session.status !== 'active') {
@@ -179,6 +180,8 @@ export async function processSessionAction({ userId, payload }) {
   const game = await GameTemplate.findById(session.gameId);
   if (!game) throw new ApiError(404, 'GAME_NOT_FOUND', 'Game for session no longer exists');
 
+  console.log(`[GAME_ENGINE] 🎲 Game: ${game.title} | Turn: ${session.stats.turnsUsed + 1}`);
+
   const currentScene = game.scenes.find((scene) => scene.sceneId === session.currentSceneId);
   const traceId = startTrace('session_action', {
     sessionId: session._id.toString(),
@@ -186,6 +189,7 @@ export async function processSessionAction({ userId, payload }) {
   });
 
   if (!currentScene || currentScene.isTerminal || currentScene.avenues.length === 0) {
+    console.log('[GAME_ENGINE] 🏁 Terminal state reached');
     resolveTerminal(session, game, traceId);
     await saveSessionOrThrowConflict(session);
     return {
@@ -201,6 +205,8 @@ export async function processSessionAction({ userId, payload }) {
     };
   }
 
+  console.log(`[GAME_ENGINE] 📍 Current Scene: ${currentScene.sceneId}`);
+
   const classified = await classifyRoute({
     gameTitle: game.title,
     sceneNarrative: currentScene.narrative,
@@ -212,6 +218,7 @@ export async function processSessionAction({ userId, payload }) {
   addSpan(traceId, 'classification', { routeType: classified.routeType, confidence: classified.confidence });
 
   if (classified.routeType === 'clarification') {
+    console.log('[GAME_ENGINE] ❓ Classification requested clarification');
     return resolveClarification({ session, game, currentScene, payload, classified, traceId });
   }
 
@@ -261,6 +268,8 @@ export async function processSessionAction({ userId, payload }) {
   session.stats.turnsUsed += 1;
   session.currentSceneId = destinationSceneId;
 
+  console.log(`[GAME_ENGINE] ➡️  Resolution: ${resolutionType} -> ${destinationSceneId} (+${pointsDelta} points)`);
+
   const nextScene = game.scenes.find((scene) => scene.sceneId === destinationSceneId);
   const nextVisualBase = baseVisualStateFromScene(nextScene || currentScene);
   session.visualState = applyVisualEffects(nextVisualBase, selectedAvenue);
@@ -269,6 +278,7 @@ export async function processSessionAction({ userId, payload }) {
   }
   if (nextScene?.isTerminal || session.stats.turnsUsed >= game.constraints.maxTurns) {
     session.status = session.stats.points >= game.constraints.targetPoints ? 'won' : 'lost';
+    console.log(`[GAME_ENGINE] 🏁 Game ${session.status.toUpperCase()}! Points: ${session.stats.points}/${game.constraints.targetPoints}`);
   }
 
   session.history.push({
@@ -291,6 +301,8 @@ export async function processSessionAction({ userId, payload }) {
 
   session.history[session.history.length - 1].narration = narration.text;
   await saveSessionOrThrowConflict(session);
+
+  console.log(`[GAME_ENGINE] 💾 Session saved | Status: ${session.status} | Points: ${session.stats.points}`);
 
   addSpan(traceId, 'state_update', {
     resolutionType,
