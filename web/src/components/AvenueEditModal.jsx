@@ -58,7 +58,9 @@ export function AvenueEditModal({ isOpen, scene, avenue, allScenes, onClose, onS
       .map((k) => k.trim())
       .filter(Boolean);
 
-    onSave(avenue.avenueId, {
+    // When editing an AI-generated option, keep it as AI-generated
+    // When editing a manual option, keep it as manual
+    const updates = {
       label,
       intent,
       outcome,
@@ -66,7 +68,15 @@ export function AvenueEditModal({ isOpen, scene, avenue, allScenes, onClose, onS
       points: Number(scoreImpact),
       keywords: keywordArray,
       nextSceneId: nextSceneId || null,
-    });
+    };
+
+    // Only change origin to manual if it wasn't already set
+    // This preserves 'ai_generated' origin when editing AI options
+    if (!avenue.origin) {
+      updates.origin = 'manual';
+    }
+
+    onSave(avenue.avenueId, updates);
 
     onClose();
   }, [avenue, label, intent, outcome, scoreImpact, keywords, nextSceneId, onSave, onClose]);

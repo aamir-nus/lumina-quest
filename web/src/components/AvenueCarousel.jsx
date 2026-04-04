@@ -61,7 +61,9 @@ export function AvenueCarousel({ scene, onEditAvenue, onRemoveAvenue }) {
     if (!track) return;
 
     const cardWidth = track.querySelector('.avenue-card')?.offsetWidth + 16 || 300;
-    track.scrollBy({ left: direction * cardWidth, behavior: 'smooth' });
+    // Scroll by 3 cards at a time (showing next/previous set of 3)
+    const cardsToShow = window.innerWidth >= 1200 ? 3 : window.innerWidth >= 900 ? 2 : 1;
+    track.scrollBy({ left: direction * cardWidth * cardsToShow, behavior: 'smooth' });
   }, []);
 
   const getOutcomeIcon = useCallback((outcome) => {
@@ -75,6 +77,17 @@ export function AvenueCarousel({ scene, onEditAvenue, onRemoveAvenue }) {
   const getOriginIcon = useCallback((avenue) => {
     if (avenue.origin === 'ai_generated') return '🤖';
     return '✏️';
+  }, []);
+
+  const getOriginLabel = useCallback((avenue) => {
+    if (avenue.origin === 'ai_generated') return 'Generated';
+    if (avenue.origin === 'manual') return 'Manual';
+    return 'Manual'; // Default for undefined/other
+  }, []);
+
+  const getOriginClass = useCallback((avenue) => {
+    if (avenue.origin === 'ai_generated') return 'ai-origin';
+    return 'manual-origin';
   }, []);
 
   if (!scene || scene.kind === 'ending') {
@@ -118,8 +131,8 @@ export function AvenueCarousel({ scene, onEditAvenue, onRemoveAvenue }) {
               >
                 <div className="avenue-card-visual">
                   <span className="avenue-icon">{getOriginIcon(avenue)}</span>
-                  <span className={`avenue-origin-badge ${avenue.origin === 'ai_generated' ? 'ai-origin' : 'manual-origin'}`}>
-                    {avenue.origin === 'ai_generated' ? 'AI' : 'Manual'}
+                  <span className={`avenue-origin-badge ${getOriginClass(avenue)}`}>
+                    {getOriginLabel(avenue)}
                   </span>
                   <span className="avenue-id-overlay">#{avenue.avenueId}</span>
                   <span className={`avenue-outcome-indicator ${avenue.outcome || 'partial'}`}>
@@ -128,17 +141,21 @@ export function AvenueCarousel({ scene, onEditAvenue, onRemoveAvenue }) {
                 </div>
 
                 <div className="avenue-card-content">
-                  <h4 className="avenue-card-label">{avenue.label || 'Untitled Option'}</h4>
-                  <p className="avenue-card-intent">
+                  <h4 className="avenue-card-label" data-full-text={avenue.label || 'Untitled Option'}>
+                    {avenue.label || 'Untitled Option'}
+                  </h4>
+                  <p className="avenue-card-intent" data-full-text={avenue.intent || 'No intent specified'}>
                     {avenue.intent || 'No intent specified'}
                   </p>
 
                   <div className="avenue-card-stats">
                     <span className="avenue-stat-badge">
-                      {avenue.scoreImpact ?? avenue.points ?? 0} pts
+                      <span className="label">Points</span>
+                      <span className="value">{avenue.scoreImpact ?? avenue.points ?? 0}</span>
                     </span>
                     <span className="avenue-stat-badge">
-                      → {avenue.nextSceneId || 'End'}
+                      <span className="label">To</span>
+                      <span className="value">{avenue.nextSceneId || 'End'}</span>
                     </span>
                   </div>
 
@@ -147,16 +164,18 @@ export function AvenueCarousel({ scene, onEditAvenue, onRemoveAvenue }) {
                       onClick={() => onEditAvenue(avenue)}
                       className="avenue-action-btn avenue-edit-btn"
                     >
-                      ✏️ Edit
-                    </button>
-                    <button
-                      onClick={() => onRemoveAvenue(avenue.avenueId)}
-                      className="avenue-action-btn avenue-delete-btn"
-                    >
-                      🗑️
+                      Edit
                     </button>
                   </div>
                 </div>
+
+                <button
+                  onClick={() => onRemoveAvenue(avenue.avenueId)}
+                  className="avenue-delete-btn"
+                  aria-label="Delete option"
+                >
+                  🗑️
+                </button>
               </div>
             ))
           ) : (
