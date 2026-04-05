@@ -48,7 +48,11 @@ export async function connectMongoWithRetry() {
     attempt += 1;
     try {
       await mongoose.connect(env.mongoUri, {
-        serverSelectionTimeoutMS: 15000
+        serverSelectionTimeoutMS: 15000,
+        maxPoolSize: 50,
+        minPoolSize: 10,
+        socketTimeoutMS: 45000,
+        connectTimeoutMS: 10000
       });
       return;
     } catch (error) {

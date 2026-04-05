@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
 import { EndingPanel } from './EndingPanel';
-import { GameStage } from './GameStage';
-import { SceneTransitionOverlay } from './SceneTransitionOverlay';
 import { WizardBubble } from './WizardBubble';
 
 function sanitizeClientInput(value) {
@@ -61,11 +59,14 @@ export function PlayerPanel({ me, externalSessionId }) {
   });
 
   const actionMutation = useMutation({
-    mutationFn: async () => (await api.post('/sessions/action', {
-      sessionId,
-      userInput: sanitizeClientInput(input),
-      tone: 'cinematic'
-    })).data,
+    mutationFn: async (userInputOverride) => {
+      const inputToUse = userInputOverride !== undefined ? userInputOverride : input;
+      return (await api.post('/sessions/action', {
+        sessionId,
+        userInput: sanitizeClientInput(inputToUse),
+        tone: 'cinematic'
+      })).data;
+    },
     onSuccess: (data) => {
       setInput('');
       setLastResolution(data.resolution);
@@ -84,7 +85,6 @@ export function PlayerPanel({ me, externalSessionId }) {
   const game = sessionQuery.data?.game;
   const turnsRemaining = game ? Math.max(0, game.constraints.maxTurns - (session?.stats?.turnsUsed || 0)) : 0;
   const pointsToTarget = game ? Math.max(0, game.constraints.targetPoints - (session?.stats?.points || 0)) : 0;
-  const transition = session?.visualState?.transition || lastResolution?.type || '';
   const invalidLimit = scene?.inputPolicy?.invalidAttemptLimit || 3;
   const invalidRemaining = lastResolution?.invalidAttemptsRemaining ?? invalidLimit;
 
@@ -173,12 +173,6 @@ export function PlayerPanel({ me, externalSessionId }) {
             {/* Wizard Bubble with Dialogue */}
             <WizardBubble narrative={scene.narrative} lastResolution={lastResolution} />
 
-            {/* Game Stage Visual */}
-            <div className="scene animatedScene">
-              <GameStage scene={scene} visualState={session.visualState} />
-              <SceneTransitionOverlay transition={transition} />
-            </div>
-
             {/* Action Options */}
             {session.status === 'active' && (
               <>
@@ -187,8 +181,12 @@ export function PlayerPanel({ me, externalSessionId }) {
                     <button
                       type="button"
                       key={avenue.avenueId}
-                      onClick={() => setInput(avenue.label)}
+                      onClick={() => {
+                        setInput('');
+                        actionMutation.mutate(`[SELECT:${avenue.avenueId}] ${avenue.label}`);
+                      }}
                       className="chipBtn"
+                      disabled={actionMutation.isPending}
                     >
                       {avenue.label}
                     </button>
@@ -201,22 +199,24 @@ export function PlayerPanel({ me, externalSessionId }) {
                     id="player-action"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder="Or describe your own action..."
+                    placeholder="Click an option above or type your own action..."
                     aria-label="Describe your action"
-                    disabled={session.status !== 'active'}
+                    disabled={session.status !== 'active' || actionMutation.isPending}
                   />
                   <button
                     type="button"
                     onClick={() => actionMutation.mutate()}
-                    disabled={!input || actionMutation.isPending || session.status !== 'active'}
+                    disabled={!input.trim() || actionMutation.isPending || session.status !== 'active'}
                   >
                     {actionMutation.isPending ? '⏳' : 'Send'}
                   </button>
                 </div>
 
-                <p className="muted">
-                  Freeform attempts remaining on this beat: {invalidRemaining}. Turns left: {turnsRemaining}. Points to target: {pointsToTarget}.
-                </p>
+                {me?.role === 'admin' && (
+                  <p className="muted">
+                    Freeform attempts remaining: {invalidRemaining}. Turns left: {turnsRemaining}. Points to target: {pointsToTarget}.
+                  </p>
+                )}
 
                 {lastResolution?.type === 'invalid' ? (
                   <p className="error" role="alert">

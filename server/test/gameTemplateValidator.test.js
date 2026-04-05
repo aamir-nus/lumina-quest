@@ -4,35 +4,6 @@ import { normalizeGameTemplate } from '../src/services/gameTemplateNormalizer.js
 import { validateGameTemplate } from '../src/services/gameTemplateValidator.js';
 import { getExpectedOptionRange } from '../src/services/optionCountGenerator.js';
 
-test('normalizeGameTemplate preserves legacy templates with defaults', () => {
-  const normalized = normalizeGameTemplate({
-    title: 'Legacy Quest',
-    description: 'old shape',
-    constraints: { maxTurns: 3, targetPoints: 1 },
-    wildcardConfig: { enabled: false, recoverySceneId: '' },
-    startSceneId: 'scene_start',
-    scenes: [
-      {
-        sceneId: 'scene_start',
-        narrative: 'Begin here',
-        isTerminal: false,
-        avenues: [{ avenueId: 'a1', label: 'Go', points: 1, nextSceneId: 'scene_end' }]
-      },
-      {
-        sceneId: 'scene_end',
-        narrative: 'Done',
-        isTerminal: true,
-        avenues: []
-      }
-    ]
-  });
-
-  assert.equal(normalized.schemaVersion, 1);
-  assert.equal(normalized.scenes[0].kind, 'start');
-  assert.equal(normalized.scenes[0].avenues[0].scoreImpact, 1);
-  assert.equal(normalized.scenes[1].kind, 'ending');
-});
-
 test('validateGameTemplate accepts a minimal publishable v2 game', () => {
   const optionRange = getExpectedOptionRange('easy');
   const optionCount = optionRange.min;

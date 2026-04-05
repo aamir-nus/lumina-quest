@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { env } from '../config/env.js';
+import { logger } from '../utils/logger.js';
 
 export function assertLmStudioConfigured(context = 'lmstudio_request') {
   if (env.llmProvider !== 'lmstudio') {
@@ -48,7 +49,7 @@ export function parseJsonResponse(response, fallback = {}) {
         .trim()
     );
   } catch (error) {
-    console.log('[LMSTUDIO] parse failure', {
+    logger.warn('[LMSTUDIO] parse failure', {
       message: error.message,
       snippet: String(outputText).slice(0, 180)
     });

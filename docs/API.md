@@ -76,9 +76,9 @@ All endpoints except registration/login require authentication via:
 
 ### Game Schema
 
-The API supports both v1 (legacy) and v2 (guided-graph) game structures. V2 games include additional metadata for AI-assisted authoring and bounded narrative flow.
+The API uses a v2 guided-graph structure with metadata for AI-assisted authoring and bounded narrative flow.
 
-#### V2 Game Structure
+#### Game Structure
 
 ```json
 {
@@ -175,14 +175,6 @@ The API supports both v1 (legacy) and v2 (guided-graph) game structures. V2 game
 - `scoreImpact` (number): Points awarded (preferred field; `points` is alias)
 - `origin` (string): Creation method (`"ai_generated"` | `"manual"`)
 
-#### V1 Legacy Support
-
-Legacy v1 games remain fully playable. The runtime normalizes v1 games to the v2 structure automatically. V1 games use:
-- `isTerminal` instead of `kind` and `endingType`
-- `renderConfig` instead of `visualEffects`
-- No `storyConfig` or `generationState`
-```
-
 ### Create Game Response
 
 ```json
@@ -200,9 +192,9 @@ Legacy v1 games remain fully playable. The runtime normalizes v1 games to the v2
 
 ---
 
-## Game Generation (v2)
+## Game Generation
 
-V2 provides AI-assisted game authoring with guided narrative flow. These endpoints use LMStudio (or configured LLM provider) to generate story beats and player options.
+AI-assisted game authoring with guided narrative flow. These endpoints use LMStudio (or configured LLM provider) to generate story beats and player options.
 
 ### Endpoints
 
@@ -398,14 +390,15 @@ The API enforces option counts based on difficulty:
 
 | Difficulty | Min Options | Max Options |
 | ---------- | ----------- | ----------- |
-| `easy`     | 2           | 3           |
-| `medium`   | 3           | 5           |
-| `hard`     | 4           | 6           |
+| `easy`     | 1           | 3           |
+| `medium`   | 1           | 5           |
+| `hard`     | 1           | 6           |
 
 **Validation:**
-- Carousel UI enforces max 5 options per scene
+- Carousel UI enforces max 6 options per scene
 - Backend validates during save
 - Generation services target these ranges
+- Min 1 option allows flexibility for simple binary choices
 
 ### Fallback Behavior
 
@@ -549,6 +542,55 @@ Watch for these in server logs during generation:
 }
 ```
 
+### Action Processing Modes
+
+The endpoint supports four processing modes with different performance characteristics:
+
+#### 1. Direct Selection Mode (Fastest)
+
+**Trigger:** Frontend sends `[SELECT:avenueId]` prefix (option button clicks)
+
+**Behavior:**
+- Bypasses all text matching and LLM classification
+- Uses scene narrative directly (no LLM narration)
+- Instant transition (< 100ms)
+- `matchedBy: "direct_selection"` in response
+- Zero LLM tokens consumed
+
+#### 2. Exact Match Mode (Fast)
+
+**Trigger:** User types text matching an option label exactly
+
+**Behavior:**
+- Direct text match (case-sensitive) or normalized match (case-insensitive)
+- Skips LLM classification and narration
+- `matchedBy: "direct"` or `"normalized"` in response
+- Zero LLM tokens consumed
+
+#### 3. Freeform Mode - Mapped (Slower)
+
+**Trigger:** User types custom input that LLM can map to an authored option
+
+**Behavior:**
+- LLM classifies intent against authored options
+- If matched → transition with LLM narration
+- `matchedBy: "llm"` in response
+- Consumes LLM tokens (~200-500 total)
+- Typical latency: 3-8 seconds
+
+#### 4. Freeform Mode - Invalid (Error)
+
+**Trigger:** User types custom input that LLM cannot map to any authored option
+
+**Behavior:**
+- Returns `type: "invalid"` error response
+- Increases scene error count
+- Wizard displays warning message
+- If error count ≥ `invalidAttemptLimit` (default: 3) → game over (fail ending)
+- `matchedBy: "none"` in response
+- No scene transition, player stays on current scene
+```
+
 ---
 
 ## LLM Integration
@@ -609,9 +651,29 @@ OPENROUTER_SITE_NAME=LuminaQuest
 ### LLM Processing Pipeline
 
 ```
-Player Input → classifyRoute() → generateNarration() → Response
-                 (intent)           (flavor text)
+Player Input
+    ↓
+[Direct Selection?] → YES → Use scene narrative → Response (0 tokens, <100ms)
+    ↓ NO
+[Exact Match?] → YES → Skip classification, use scene narrative → Response (0 tokens, <100ms)
+    ↓ NO
+classifyRoute() → Can map to avenue? → YES → generateNarration() → Response (~200-500 tokens, 3-8s)
+                     ↓ NO
+                     Return invalid error → Wizard warning → Error count +1
+                     ↓
+                     Error count ≥ max? → YES → Game over (fail)
+                                          ↓ NO
+                     Stay on current scene, try again
 ```
+
+**Performance Characteristics:**
+
+| Mode | LLM Calls | Tokens | Latency | Scene Change |
+| ---- | --------- | ------ | ------- | ------------ |
+| Direct Selection | 0 | 0 | <100ms | Yes |
+| Exact Match | 0 | 0 | <100ms | Yes |
+| Freeform (Mapped) | 2 | ~200-500 | 3-8s | Yes |
+| Freeform (Invalid) | 1 | ~50-100 | 1-3s | No (retry) |
 
 #### Stage 1: Intent Classification
 
@@ -694,6 +756,23 @@ Player Input → classifyRoute() → generateNarration() → Response
 
 The server logs all LLM operations with emoji markers:
 
+**Direct Selection Mode (Option Button Click):**
+```
+[INPUT_MATCH] direct_selection sceneId=entrance, avenueId=enter_cave
+[GAME_ENGINE] ➡️  Resolution matchedBy=direct_selection, destinationSceneId=chamber, pointsDelta=1
+[GAME_ENGINE] ⚡ Skipping LLM narration for direct match
+[GAME_ENGINE] 💾 Session saved | Status: active | Points: 1
+```
+
+**Exact Match Mode (Typed Option Text):**
+```
+[INPUT_MATCH] direct sceneId=entrance, avenueId=enter_cave
+[GAME_ENGINE] ➡️  Resolution matchedBy=direct, destinationSceneId=chamber, pointsDelta=1
+[GAME_ENGINE] ⚡ Skipping LLM narration for direct match
+[GAME_ENGINE] 💾 Session saved | Status: active | Points: 1
+```
+
+**Freeform Mode (LLM Classification):**
 ```
 [GAME_ENGINE] 🎮 Processing action...
 [GAME_ENGINE] 👤 User Input: "I want to explore"
@@ -709,7 +788,7 @@ The server logs all LLM operations with emoji markers:
 [LLM_CLASSIFY] 📊 Result: routeType=avenue, avenueId=enter_cave, confidence=0.95
 [LLM_CLASSIFY] ⏱️  Latency: 8500.5ms | Tokens: 495
 
-[GAME_ENGINE] ➡️  Resolution: avenue -> chamber (+1 points)
+[GAME_ENGINE] ➡️  Resolution matchedBy=llm, destinationSceneId=chamber, pointsDelta=1
 
 [LLM_NARRATE] ✍️  Generating narration...
 [LLM_NARRATE] 📝 Resolution: avenue | Route: Enter cave | Tone: cinematic
@@ -719,6 +798,35 @@ The server logs all LLM operations with emoji markers:
 [LLM_NARRATE] ⏱️  Latency: 3200.0ms | Tokens: 225
 
 [GAME_ENGINE] 💾 Session saved | Status: active | Points: 1
+```
+
+**Freeform Mode (Invalid Attempt):**
+```
+[GAME_ENGINE] 🎮 Processing action...
+[GAME_ENGINE] 👤 User Input: "I do something completely unrelated"
+[GAME_ENGINE] 🎲 Game: The Crystal Cave | Turn: 2
+[GAME_ENGINE] 📍 Current Scene: entrance
+
+[LLM_CLASSIFY] 🎯 Starting classification...
+[LLM_CLASSIFY] 📖 Input: "I do something completely unrelated"
+[LLM_CLASSIFY] 📍 Available avenues: Enter cave, Turn back
+[LLM_CLASSIFY] 🔄 Calling LLM provider...
+[LLM_CLASSIFY] ✅ Got LLM response, parsing...
+[LLM_CLASSIFY] 📊 Result: routeType=no_match, confidence=0.2
+[LLM_CLASSIFY] ⏱️  Latency: 2500.0ms | Tokens: 180
+
+[GAME_ENGINE] ⚠️ Invalid attempt - input did not match any authored route
+[GAME_ENGINE] 📊 Error count: 1/3 for scene entrance
+[GAME_ENGINE] 💾 Session saved | Status: active | Points: 0
+
+Response: {
+  "resolution": {
+    "type": "invalid",
+    "matchedBy": "none",
+    "narration": "The wizard frowns. 'That makes no sense! Try again.'",
+    "invalidAttemptsRemaining": 2
+  }
+}
 ```
 
 ---

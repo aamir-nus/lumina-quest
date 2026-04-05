@@ -13,15 +13,15 @@
 function getTotalOptionRange(difficulty) {
   switch (difficulty) {
     case 'hard':
-      // Hard: 4-6 options (larger range for unpredictability)
-      return { min: 4, max: 6 };
+      // Hard: 1-6 options (larger max for unpredictability)
+      return { min: 1, max: 6 };
     case 'medium':
-      // Medium: 3-5 options (moderate range)
-      return { min: 3, max: 5 };
+      // Medium: 1-5 options (moderate max)
+      return { min: 1, max: 5 };
     case 'easy':
     default:
-      // Easy: 2-3 options (smaller range for predictability)
-      return { min: 2, max: 3 };
+      // Easy: 1-3 options (smaller max for predictability)
+      return { min: 1, max: 3 };
   }
 }
 

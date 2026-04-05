@@ -22,8 +22,8 @@ export function GameStage({ scene, visualState }) {
           </div>
         ))}
         <div className="sprite" data-mood={visualState?.spriteMood || render.sprite?.mood || 'neutral'}>
-          <span>{render.sprite?.id || 'hero'}</span>
-          <small>{visualState?.spriteMood || render.sprite?.mood || 'neutral'}</small>
+          <span className="srOnly">{render.sprite?.id || 'hero'}</span>
+          <small className="srOnly">{visualState?.spriteMood || render.sprite?.mood || 'neutral'}</small>
         </div>
         {(render.foregroundLayers || []).map((layer) => (
           <div
@@ -35,7 +35,6 @@ export function GameStage({ scene, visualState }) {
           </div>
         ))}
       </div>
-      <p className="muted">scene: {scene.sceneId}</p>
     </section>
   );
 }

@@ -1,3 +1,5 @@
+import { logger } from '../utils/logger.js';
+
 function toPlain(game) {
   if (!game) return null;
   if (typeof game.toObject === 'function') {
@@ -28,8 +30,8 @@ function normalizeAvenue(avenue = {}, index = 0) {
 }
 
 function normalizeScene(scene = {}, index = 0) {
-  const kind = scene.kind || (index === 0 ? 'start' : scene.isTerminal ? 'ending' : 'beat');
-  const isTerminal = Boolean(scene.isTerminal || kind === 'ending');
+  const kind = scene.kind || (index === 0 ? 'start' : 'beat');
+  const isTerminal = kind === 'ending' || Boolean(scene.isTerminal);
   return {
     sceneId: scene.sceneId || `scene_${index}`,
     kind,
@@ -63,7 +65,7 @@ export function normalizeGameTemplate(game) {
   const plain = toPlain(game);
   if (!plain) return null;
 
-  const schemaVersion = Number(plain.schemaVersion || 1);
+  const schemaVersion = Number(plain.schemaVersion || 2);
   const scenes = (plain.scenes || []).map(normalizeScene);
   const startSceneId = plain.startSceneId || scenes[0]?.sceneId || 'scene_start';
   const storyConfig = {
@@ -100,7 +102,7 @@ export function normalizeGameTemplate(game) {
     scenes
   };
 
-  console.log('[TEMPLATE_V2] normalize', {
+  logger.info('[TEMPLATE_V2] normalize', {
     title: normalized.title,
     schemaVersion: normalized.schemaVersion,
     sceneCount: normalized.scenes.length,

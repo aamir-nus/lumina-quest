@@ -55,7 +55,7 @@ const sceneSchema = new mongoose.Schema(
 const gameTemplateSchema = new mongoose.Schema(
   {
     adminId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    schemaVersion: { type: Number, default: 1 },
+    schemaVersion: { type: Number, default: 2 },
     title: { type: String, required: true, trim: true },
     description: { type: String, default: '' },
     storyConfig: {
