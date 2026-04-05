@@ -105,16 +105,15 @@ export async function resolveSceneInput({
     };
   }
 
-  // No match found - call LLM classifier
-  const isV2 = Number(game.schemaVersion || 1) >= 2;
+  // No match found - call LLM classifier (V2 always uses authored-only mode)
   const classified = await classifyRoute({
     gameTitle: game.title,
     sceneNarrative: currentScene.narrative,
     input: userInput,
     avenues: currentScene.avenues,
     history: sessionHistory,
-    wildcardEnabled: !isV2 && Boolean(game.wildcardConfig?.enabled),
-    mode: isV2 ? 'authored-only' : 'legacy'
+    wildcardEnabled: false,
+    mode: 'authored-only'
   });
 
   return {

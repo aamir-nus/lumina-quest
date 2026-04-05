@@ -73,54 +73,47 @@ export function validateGameTemplate(input, { mode = 'draft' } = {}) {
     }
   }
 
-  if (game.schemaVersion >= 2) {
-    const starts = game.scenes.filter((scene) => scene.kind === 'start');
-    const beats = game.scenes.filter((scene) => scene.kind === 'beat');
+  // V2-only validation
+  const starts = game.scenes.filter((scene) => scene.kind === 'start');
+  const beats = game.scenes.filter((scene) => scene.kind === 'beat');
 
-    if (starts.length !== 1) {
-      errors.push('Exactly one start scene is required for v2 templates');
-    }
-    if (beats.length < 3 || beats.length > 10) {
-      errors.push('v2 templates require 3-10 beat scenes');
-    }
+  if (starts.length !== 1) {
+    errors.push('Exactly one start scene is required');
+  }
+  if (beats.length < 3 || beats.length > 10) {
+    errors.push('Games require 3-10 beat scenes');
+  }
 
-    for (const scene of game.scenes) {
-      if (scene.kind !== 'ending' && !scene.isTerminal) {
-        if (!scene.inputPolicy) {
-          errors.push(`Scene ${scene.sceneId} is missing inputPolicy`);
+  for (const scene of game.scenes) {
+    if (scene.kind !== 'ending' && !scene.isTerminal) {
+      if (!scene.inputPolicy) {
+        errors.push(`Scene ${scene.sceneId} is missing inputPolicy`);
+      }
+
+      const avenueCount = (scene.avenues || []).length;
+      if (mode === 'publish') {
+        const { min, max } = expectedOptionRange(game.storyConfig?.difficulty);
+        if (avenueCount < min) {
+          errors.push(`Scene ${scene.sceneId} must have at least ${min} options for ${game.storyConfig?.difficulty || 'easy'} difficulty`);
         }
-
-        const avenueCount = (scene.avenues || []).length;
-        if (mode === 'publish') {
-          const { min, max } = expectedOptionRange(game.storyConfig?.difficulty);
-          if (avenueCount < min) {
-            errors.push(`Scene ${scene.sceneId} must have at least ${min} options for ${game.storyConfig?.difficulty || 'easy'} difficulty`);
-          }
-          if (avenueCount > max) {
-            errors.push(`Scene ${scene.sceneId} can have at most ${max} options for ${game.storyConfig?.difficulty || 'easy'} difficulty`);
-          }
-        } else if (avenueCount > 0) {
-          const { min, max } = expectedOptionRange(game.storyConfig?.difficulty);
-          if (avenueCount < min) {
-            warnings.push(`Scene ${scene.sceneId} currently has ${avenueCount} options; at least ${min} recommended`);
-          }
-          if (avenueCount > max) {
-            warnings.push(`Scene ${scene.sceneId} currently has ${avenueCount} options; at most ${max} recommended`);
-          }
+        if (avenueCount > max) {
+          errors.push(`Scene ${scene.sceneId} can have at most ${max} options for ${game.storyConfig?.difficulty || 'easy'} difficulty`);
+        }
+      } else if (avenueCount > 0) {
+        const { min, max } = expectedOptionRange(game.storyConfig?.difficulty);
+        if (avenueCount < min) {
+          warnings.push(`Scene ${scene.sceneId} currently has ${avenueCount} options; at least ${min} recommended`);
+        }
+        if (avenueCount > max) {
+          warnings.push(`Scene ${scene.sceneId} currently has ${avenueCount} options; at most ${max} recommended`);
         }
       }
-    }
-  } else {
-    const terminals = game.scenes.filter((scene) => scene.isTerminal);
-    if (terminals.length === 0) {
-      errors.push('At least one terminal scene is required');
     }
   }
 
   logger.info('[TEMPLATE_V2] validate', {
     title: game.title,
     mode,
-    schemaVersion: game.schemaVersion,
     errors: errors.length,
     warnings: warnings.length
   });

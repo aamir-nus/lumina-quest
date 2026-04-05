@@ -2,7 +2,6 @@ import { ApiError } from '../errors/ApiError.js';
 import { GameTemplate } from '../models/GameTemplate.js';
 import { PlayerSession } from '../models/PlayerSession.js';
 import { generateNarration } from './llmResolver.js';
-import { evaluateWildcard } from './wildcardPolicyService.js';
 import { addSpan, endTrace, startTrace } from './traceService.js';
 import { normalizeGameTemplate } from './gameTemplateNormalizer.js';
 import { resolveSceneInput } from './sessionInputResolver.js';
@@ -125,58 +124,6 @@ function resolveTerminal(session, game, traceId) {
   endTrace(traceId, { status: session.status });
 }
 
-async function resolveClarification({ session, game, currentScene, payload, classified, traceId }) {
-  const narration = await generateNarration({
-    gameTitle: game.title,
-    sceneNarrative: currentScene.narrative,
-    playerInput: payload.userInput,
-    resolutionType: 'clarification',
-    routeLabel: '',
-    tone: payload.tone
-  });
-
-  session.stats.turnsUsed += 1;
-  const maxTurnsReached = session.stats.turnsUsed >= game.constraints.maxTurns;
-  if (maxTurnsReached) {
-    session.status = session.stats.points >= game.constraints.targetPoints ? 'won' : 'lost';
-  }
-
-  session.history.push({
-    turn: session.stats.turnsUsed,
-    sceneId: currentScene.sceneId,
-    userQuery: payload.userInput,
-    resolvedAvenueId: null,
-    narration: narration.text,
-    pointsDelta: 0
-  });
-  session.visualState.transition = 'pulse';
-
-  await saveSessionOrThrowConflict(session);
-  addSpan(traceId, 'clarification', { maxTurnsReached });
-  endTrace(traceId, { status: session.status, routeType: 'clarification' });
-
-  return {
-    session,
-    currentScene,
-    resolution: {
-      type: 'clarification',
-      matchedBy: classified.matchedBy || 'none',
-      selectedAvenueId: null,
-      wildcardMode: null,
-      confidence: classified.confidence || 0.4,
-      explanation: classified.explanation || 'Need more detail to map your intent safely.',
-      narration: narration.text,
-      providerResponse: classified.providerResponse,
-      llm: {
-        provider: classified.provider || narration.provider || 'unknown',
-        tokens: mergeUsage(classified.usage, narration.usage),
-        computeApprox: mergeCompute(classified.computeApprox, narration.computeApprox)
-      },
-      traceId
-    }
-  };
-}
-
 /* process one player action and persist deterministic game state changes. */
 export async function processSessionAction({ userId, payload }) {
   logger.info('[GAME_ENGINE] 🎮 Processing action...', { userInput: payload.userInput });
@@ -226,8 +173,9 @@ export async function processSessionAction({ userId, payload }) {
   });
   addSpan(traceId, 'classification', { routeType: classified.routeType, confidence: classified.confidence });
 
-  const isV2 = Number(game.schemaVersion || 1) >= 2;
-  if (isV2 && (classified.routeType === 'no_match' || classified.routeType === 'clarification')) {
+  // Only 'avenue' route type means successful match to authored option
+  // 'no_match' or 'clarification' means input couldn't be mapped → invalid attempt
+  if (classified.routeType !== 'avenue') {
     const invalid = applyInvalidAttempt({ session, scene: currentScene });
     const narration = buildDiegeticFailureMessage({ lost: invalid.lost, remaining: invalid.remaining });
 
@@ -273,56 +221,16 @@ export async function processSessionAction({ userId, payload }) {
     };
   }
 
-  if (classified.routeType === 'clarification') {
-    logger.info('[GAME_ENGINE] ❓ Classification requested clarification');
-    return resolveClarification({ session, game, currentScene, payload, classified, traceId });
-  }
+  // Successful match to authored route
+  const resolutionType = 'avenue';
+  const selectedAvenue =
+    currentScene.avenues.find((avenue) => avenue.avenueId === classified.avenueId) || currentScene.avenues[0];
+  const destinationSceneId = selectedAvenue.nextSceneId;
+  const pointsDelta = selectedAvenue.scoreImpact ?? selectedAvenue.points;
+  const explanation = classified.explanation || `Mapped to authored route ${selectedAvenue.label}`;
 
-  let resolutionType = 'avenue';
-  let selectedAvenue = null;
-  let pointsDelta = 0;
-  let destinationSceneId = currentScene.sceneId;
-  let wildcardMode = null;
-  let explanation = classified.explanation || '';
-
-  if (classified.routeType === 'wildcard') {
-    const wildcardDecision = evaluateWildcard({
-      game,
-      currentScene,
-      candidate: classified.wildcard || {}
-    });
-    addSpan(traceId, 'wildcard_policy', wildcardDecision);
-
-    if (!wildcardDecision.approved) {
-      return resolveClarification({
-        session,
-        game,
-        currentScene,
-        payload,
-        classified: {
-          ...classified,
-          explanation: wildcardDecision.reason
-        },
-        traceId
-      });
-    }
-
-    resolutionType = 'wildcard';
-    destinationSceneId = wildcardDecision.destinationSceneId;
-    pointsDelta = wildcardDecision.pointsDelta;
-    wildcardMode = wildcardDecision.mode;
-    explanation = wildcardDecision.explanation;
-  } else {
-    selectedAvenue =
-      currentScene.avenues.find((avenue) => avenue.avenueId === classified.avenueId) || currentScene.avenues[0];
-    destinationSceneId = selectedAvenue.nextSceneId;
-    pointsDelta = selectedAvenue.scoreImpact ?? selectedAvenue.points;
-    explanation = classified.explanation || `Mapped to authored route ${selectedAvenue.label}`;
-  }
-
-  if (isV2) {
-    resetInvalidAttempts(session, currentScene.sceneId);
-  }
+  // Reset invalid attempts on successful action
+  resetInvalidAttempts(session, currentScene.sceneId);
   session.stats.points += pointsDelta;
   session.stats.turnsUsed += 1;
   session.currentSceneId = destinationSceneId;
@@ -332,9 +240,6 @@ export async function processSessionAction({ userId, payload }) {
   const nextScene = game.scenes.find((scene) => scene.sceneId === destinationSceneId);
   const nextVisualBase = baseVisualStateFromScene(nextScene || currentScene);
   session.visualState = applyVisualEffects(nextVisualBase, selectedAvenue);
-  if (resolutionType === 'wildcard') {
-    session.visualState.transition = wildcardMode === 'high-reward' ? 'arcade-flash' : 'scanline';
-  }
   if (nextScene?.isTerminal || session.stats.turnsUsed >= game.constraints.maxTurns) {
     session.status = session.stats.points >= game.constraints.targetPoints ? 'won' : 'lost';
     logger.info('[GAME_ENGINE] 🏁 Game finished', { status: session.status.toUpperCase(), points: session.stats.points, targetPoints: game.constraints.targetPoints });
@@ -369,7 +274,7 @@ export async function processSessionAction({ userId, payload }) {
       sceneNarrative: nextScene?.narrative || currentScene.narrative,
       playerInput: payload.userInput,
       resolutionType,
-      routeLabel: selectedAvenue?.label || wildcardMode || '',
+      routeLabel: selectedAvenue?.label || '',
       tone: payload.tone
     });
   }
@@ -392,9 +297,9 @@ export async function processSessionAction({ userId, payload }) {
     currentScene: nextScene,
     resolution: {
       type: resolutionType,
-      matchedBy: classified.matchedBy || (resolutionType === 'wildcard' ? 'wildcard' : 'llm'),
+      matchedBy: classified.matchedBy || 'llm',
       selectedAvenueId: selectedAvenue?.avenueId || null,
-      wildcardMode,
+      wildcardMode: null,
       confidence: classified.confidence || 0.5,
       explanation,
       narration: narration.text,

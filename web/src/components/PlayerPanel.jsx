@@ -16,7 +16,6 @@ export function PlayerPanel({ me, externalSessionId }) {
   const [input, setInput] = useState('');
   const [lastResolution, setLastResolution] = useState(null);
   const [showGameMenu, setShowGameMenu] = useState(true);
-  const [isTyping, setIsTyping] = useState(false);
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -70,7 +69,6 @@ export function PlayerPanel({ me, externalSessionId }) {
     },
     onSuccess: (data) => {
       setInput('');
-      setIsTyping(false);
       setLastResolution(data.resolution);
       queryClient.setQueryData(['session', sessionId], (old) => ({
         ...(old || {}),
@@ -184,7 +182,6 @@ export function PlayerPanel({ me, externalSessionId }) {
                       type="button"
                       key={avenue.avenueId}
                       onClick={() => {
-                        setIsTyping(false);
                         setInput('');
                         actionMutation.mutate(`[SELECT:${avenue.avenueId}] ${avenue.label}`);
                       }}
@@ -201,18 +198,15 @@ export function PlayerPanel({ me, externalSessionId }) {
                   <input
                     id="player-action"
                     value={input}
-                    onChange={(e) => {
-                      setInput(e.target.value);
-                      setIsTyping(e.target.value.length > 0);
-                    }}
-                    placeholder={isTyping ? "Describe your action..." : "Click an option above or type your own action..."}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder="Click an option above or type your own action..."
                     aria-label="Describe your action"
-                    disabled={session.status !== 'active' || actionMutation.isPending || !isTyping}
+                    disabled={session.status !== 'active' || actionMutation.isPending}
                   />
                   <button
                     type="button"
                     onClick={() => actionMutation.mutate()}
-                    disabled={!input.trim() || actionMutation.isPending || session.status !== 'active' || !isTyping}
+                    disabled={!input.trim() || actionMutation.isPending || session.status !== 'active'}
                   >
                     {actionMutation.isPending ? '⏳' : 'Send'}
                   </button>
