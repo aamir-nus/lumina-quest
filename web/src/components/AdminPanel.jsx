@@ -1,9 +1,10 @@
 import { memo, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
-import { GraphCanvas } from './GraphCanvas';
 import { GameEditor } from './GameEditor';
+import { GameAuthorWizard } from './GameAuthorWizard';
 import { UI } from '../constants/ui';
+import '../styles/admin.css';
 
 /**
  * @param {{ me: { id?: string, email?: string, role?: string } | null, onPlaytestSession: (sessionId: string) => void }} props
@@ -12,13 +13,8 @@ export const AdminPanel = memo(function AdminPanel({ me, onPlaytestSession }) {
   const queryClient = useQueryClient();
   const [selectedGameId, setSelectedGameId] = useState('');
   const [startSceneOverride, setStartSceneOverride] = useState('');
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showCreateWizard, setShowCreateWizard] = useState(false);
   const [editingGame, setEditingGame] = useState(null);
-
-  // Form state for game generation
-  const [gameTitle, setGameTitle] = useState('');
-  const [gameDescription, setGameDescription] = useState('');
-  const [gameStory, setGameStory] = useState('');
 
   const myGames = useQuery({
     queryKey: ['my-games'],
@@ -33,21 +29,6 @@ export const AdminPanel = memo(function AdminPanel({ me, onPlaytestSession }) {
       setSelectedGameId(myGames.data[0]._id);
     }
   }, [myGames.data, selectedGameId]);
-
-  const generateMutation = useMutation({
-    mutationFn: async (data) => {
-      const response = await api.post('/games/generate', data);
-      return response.data.game;
-    },
-    onSuccess: (game) => {
-      queryClient.invalidateQueries({ queryKey: ['my-games'] });
-      setShowCreateForm(false);
-      setGameTitle('');
-      setGameDescription('');
-      setGameStory('');
-      setEditingGame(game);
-    }
-  });
 
   const deleteMutation = useMutation({
     mutationFn: async (gameId) => (await api.delete(`/games/${gameId}`)).data,
@@ -121,10 +102,23 @@ export const AdminPanel = memo(function AdminPanel({ me, onPlaytestSession }) {
       <GameEditor
         game={editingGame}
         onSave={(updatedGame) => {
-          setEditingGame(null);
+          // Update the editor with the saved game instead of closing
+          setEditingGame(updatedGame);
           setSelectedGameId(updatedGame._id);
         }}
         onCancel={() => setEditingGame(null)}
+      />
+    );
+  }
+
+  if (showCreateWizard) {
+    return (
+      <GameAuthorWizard
+        onCancel={() => setShowCreateWizard(false)}
+        onOpenEditor={(game) => {
+          setShowCreateWizard(false);
+          setEditingGame(game);
+        }}
       />
     );
   }
@@ -133,86 +127,23 @@ export const AdminPanel = memo(function AdminPanel({ me, onPlaytestSession }) {
     <section className="card" aria-live="polite">
       <h2>Admin Forge</h2>
 
-      <div className="row">
-        <button type="button" onClick={() => setShowCreateForm(!showCreateForm)}>
-          {showCreateForm ? 'Cancel' : '+ Create New Game'}
+      <div className="row" style={{ justifyContent: 'center', marginBottom: '20px' }}>
+        <button type="button" onClick={() => setShowCreateWizard(true)}>
+          + Create New Game
         </button>
       </div>
 
-      {showCreateForm && (
-        <div className="subcard">
-          <h3>Generate Game with AI</h3>
-          <p className="muted">Describe your story and the AI will generate a complete game with scenes and choices.</p>
-
-          <div className="row">
-            <label htmlFor="game-title">Title</label>
-          </div>
-          <input
-            id="game-title"
-            value={gameTitle}
-            onChange={(e) => setGameTitle(e.target.value)}
-            placeholder="The Gate of Emberfall"
-          />
-
-          <div className="row">
-            <label htmlFor="game-description">Description (optional)</label>
-          </div>
-          <input
-            id="game-description"
-            value={gameDescription}
-            onChange={(e) => setGameDescription(e.target.value)}
-            placeholder="A compact adventure to validate the story engine"
-          />
-
-          <div className="row">
-            <label htmlFor="game-story">Story Flow</label>
-          </div>
-          <textarea
-            id="game-story"
-            value={gameStory}
-            onChange={(e) => setGameStory(e.target.value)}
-            rows={5}
-            placeholder="Player arrives at a guarded gate. They can reason with the guard or sneak through an alley. Inside the town, they hear alarm bells and see a relic chest. They must choose between helping civilians or looting the chest. The final scene reflects their choice."
-            style={{ width: '100%', marginBottom: '10px' }}
-          />
-
-          <div className="row">
-            <button
-              type="button"
-              onClick={() => generateMutation.mutate({ title: gameTitle, description: gameDescription, story: gameStory })}
-              disabled={generateMutation.isPending || !gameTitle || !gameStory}
-            >
-              {generateMutation.isPending ? 'Generating...' : 'Generate Game'}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setShowCreateForm(false);
-                setGameTitle('');
-                setGameDescription('');
-                setGameStory('');
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-
-          {generateMutation.error && (
-            <p className="error" role="alert">
-              {generateMutation.error.response?.data?.error?.message || 'Failed to generate game'}
-            </p>
-          )}
-        </div>
-      )}
-
-      <div className="list">
+      <div className="admin-games-grid">
         {(myGames.data || []).map((game) => (
-          <div key={game._id} className="listItem">
-            <div>
+          <div key={game._id} className="admin-game-card">
+            <div className="admin-game-header">
               <strong>{game.title}</strong>
-              <p className="muted">{game.status} | scenes: {game.scenes.length}</p>
+              <p className="muted">
+                {game.status} | scenes: {game.scenes.length} | schema v{game.schemaVersion || 1}
+                {game.generationState?.status ? ` | ${game.generationState.status}` : ''}
+              </p>
             </div>
-            <div className="row">
+            <div className="admin-game-actions">
               <button type="button" onClick={() => setSelectedGameId(game._id)} className={selectedGameId === game._id ? 'active' : ''}>View</button>
               <button type="button" onClick={() => setEditingGame(game)}>Edit</button>
               <button type="button" onClick={() => publishMutation.mutate(game._id)} disabled={publishMutation.isPending || game.status === 'public'}>
@@ -238,15 +169,8 @@ export const AdminPanel = memo(function AdminPanel({ me, onPlaytestSession }) {
       {selectedGame && (
         <>
           <div className="subcard">
-            <h3>Graph View: {selectedGame.title}</h3>
-            <div className="graphContainer">
-              <GraphCanvas game={selectedGame} />
-            </div>
-          </div>
-
-          <div className="subcard">
-            <h3>Analysis + Playtest</h3>
-            <div className="row">
+            <h3>Analysis + Playtest: {selectedGame.title}</h3>
+            <div className="admin-test-actions" style={{ justifyContent: 'center' }}>
               <button
                 type="button"
                 onClick={() => analyzeMutation.mutate(selectedGame._id)}
@@ -307,7 +231,6 @@ export const AdminPanel = memo(function AdminPanel({ me, onPlaytestSession }) {
           </p>
         </div>
       </div>
-
       {publishMutation.error ? <p className="error">{publishMutation.error.response?.data?.error?.message || 'Publish failed'}</p> : null}
     </section>
   );

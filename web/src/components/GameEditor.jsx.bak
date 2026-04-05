@@ -13,9 +13,9 @@ function cloneGame(game) {
 }
 
 function expectedOptionRange(difficulty) {
-  if (difficulty === 'hard') return { min: 1, max: 6 };
-  if (difficulty === 'medium') return { min: 1, max: 5 };
-  return { min: 1, max: 3 };
+  if (difficulty === 'hard') return { min: 4, max: 6 };
+  if (difficulty === 'medium') return { min: 3, max: 5 };
+  return { min: 2, max: 3 };
 }
 
 function parseKeywordInput(value) {
@@ -33,7 +33,6 @@ export function GameEditor({ game, onSave, onCancel }) {
   const [generationError, setGenerationError] = useState(null);
   const [engagementMessage, setEngagementMessage] = useState(null);
   const messageIntervalRef = useRef(null);
-  const updateAvenueRef = useRef(null);
 
   // Carousel state
   const [selectedSceneId, setSelectedSceneId] = useState(null);
@@ -81,15 +80,7 @@ export function GameEditor({ game, onSave, onCancel }) {
 
   const updateMutation = useMutation({
     mutationFn: async (payload) => (await api.put(`/games/${payload._id}`, payload)).data.game,
-    onSuccess: (updatedGame) => {
-      // Update local state with the response from server
-      setEditedGame(updatedGame);
-      // Invalidate queries to ensure fresh data
-      queryClient.invalidateQueries({ queryKey: ['my-games'] });
-      queryClient.invalidateQueries({ queryKey: ['games'] });
-      // Notify parent but don't close editor
-      onSave(updatedGame);
-    }
+    onSuccess: (updatedGame) => onSave(updatedGame)
   });
 
   const generateSceneOptionsMutation = useMutation({
@@ -174,9 +165,6 @@ export function GameEditor({ game, onSave, onCancel }) {
       ))
     }));
   };
-
-  // Keep ref updated for modal callback
-  updateAvenueRef.current = updateAvenue;
 
   const addAvenue = (sceneId) => {
     setEditedGame((prev) => ({
@@ -299,9 +287,11 @@ export function GameEditor({ game, onSave, onCancel }) {
   }, []);
 
   const handleSaveAvenue = useCallback((avenueId, updates) => {
-    // Use ref to avoid stale closure - updateAvenueRef always has the latest function
-    updateAvenueRef.current(selectedSceneId, avenueId, updates);
-  }, [selectedSceneId]);
+    const scene = editedGame.scenes.find((s) => s.sceneId === selectedSceneId);
+    if (!scene) return;
+
+    updateAvenue(selectedSceneId, avenueId, updates);
+  }, [editedGame, selectedSceneId, updateAvenue]);
 
   const selectedScene = editedGame.scenes?.find((s) => s.sceneId === selectedSceneId);
 
@@ -512,6 +502,175 @@ export function GameEditor({ game, onSave, onCancel }) {
         onSave={handleSaveAvenue}
       />
 
+      <div className="list">
+        {editedGame.scenes.map((scene) => (
+          <div key={scene.sceneId} className="subcard">
+            <div className="row" style={{ justifyContent: 'space-between' }}>
+              <strong>{scene.sceneId}</strong>
+              <span className="muted">{scene.kind}{scene.endingType ? `/${scene.endingType}` : ''}</span>
+            </div>
+
+            <div className="formRow">
+              <label htmlFor={`${scene.sceneId}-goal`}>Goal Summary</label>
+              <input
+                id={`${scene.sceneId}-goal`}
+                value={scene.goalSummary || ''}
+                onChange={(event) => updateScene(scene.sceneId, { goalSummary: event.target.value })}
+              />
+            </div>
+
+            <div className="formRow">
+              <label htmlFor={`${scene.sceneId}-narrative`}>Narrative</label>
+              <textarea
+                id={`${scene.sceneId}-narrative`}
+                rows={2}
+                value={scene.narrative}
+                onChange={(event) => updateScene(scene.sceneId, { narrative: event.target.value })}
+              />
+            </div>
+
+            {scene.kind !== 'ending' && (
+              <>
+                <div className="formRow">
+                  <label htmlFor={`${scene.sceneId}-freeform`}>Allow Freeform</label>
+                  <input
+                    id={`${scene.sceneId}-freeform`}
+                    type="checkbox"
+                    checked={scene.inputPolicy?.allowFreeform ?? true}
+                    onChange={(event) => updateScenePolicy(scene.sceneId, { allowFreeform: event.target.checked })}
+                  />
+                </div>
+
+                <div className="formRow">
+                  <label htmlFor={`${scene.sceneId}-limit`}>Invalid Limit</label>
+                  <input
+                    id={`${scene.sceneId}-limit`}
+                    type="number"
+                    value={scene.inputPolicy?.invalidAttemptLimit ?? 3}
+                    onChange={(event) => updateScenePolicy(scene.sceneId, { invalidAttemptLimit: Number(event.target.value) })}
+                  />
+                </div>
+
+                <div className="formRow">
+                  <label htmlFor={`${scene.sceneId}-penalty`}>Invalid Penalty</label>
+                  <input
+                    id={`${scene.sceneId}-penalty`}
+                    type="number"
+                    value={scene.inputPolicy?.invalidPenalty ?? -1}
+                    onChange={(event) => updateScenePolicy(scene.sceneId, { invalidPenalty: Number(event.target.value) })}
+                  />
+                </div>
+
+                <div className="row" style={{ justifyContent: 'space-between', marginTop: '12px' }}>
+                  <strong>Options ({scene.avenues.length}/{MAX_AVENUES})</strong>
+                  <div className="row">
+                    <button
+                      type="button"
+                      onClick={() => generateSceneOptionsMutation.mutate(scene.sceneId)}
+                      disabled={generatingSceneId === scene.sceneId || scene.avenues.length >= MAX_AVENUES}
+                      className="ai-btn"
+                    >
+                      {generatingSceneId === scene.sceneId ? 'AI Generating...' : 'AI: Generate Options'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => addAvenue(scene.sceneId)}
+                      disabled={scene.avenues.length >= MAX_AVENUES}
+                    >
+                      + Add Option
+                    </button>
+                  </div>
+                </div>
+
+                {generatingSceneId === scene.sceneId && engagementMessage && (
+                  <p className="engagement-message" role="status" aria-live="polite">
+                    ✨ {engagementMessage}
+                  </p>
+                )}
+
+                {(scene.avenues || []).map((avenue) => (
+                  <div key={avenue.avenueId} className={`card ${avenue.origin === 'ai_generated' ? 'ai-option' : 'manual-option'}`}>
+                    <div className="row" style={{ justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <span className={`origin-badge ${avenue.origin === 'ai_generated' ? 'ai-badge' : 'manual-badge'}`}>
+                        {avenue.origin === 'ai_generated' ? 'AI Generated' : 'Manual'}
+                      </span>
+                    </div>
+                    <div className="formRow">
+                      <label>Label</label>
+                      <input
+                        value={avenue.label}
+                        onChange={(event) => updateAvenue(scene.sceneId, avenue.avenueId, { label: event.target.value })}
+                        placeholder="Option label"
+                      />
+                    </div>
+
+                    <div className="formRow">
+                      <label>Outcome</label>
+                      <select
+                        value={avenue.outcome || 'partial'}
+                        onChange={(event) => updateAvenue(scene.sceneId, avenue.avenueId, { outcome: event.target.value })}
+                      >
+                        <option value="success">success</option>
+                        <option value="partial">partial</option>
+                        <option value="fail">fail</option>
+                      </select>
+                    </div>
+
+                    <div className="formRow">
+                      <label>Score Impact</label>
+                      <input
+                        type="number"
+                        value={avenue.scoreImpact ?? avenue.points ?? 0}
+                        onChange={(event) => updateAvenue(scene.sceneId, avenue.avenueId, {
+                          scoreImpact: Number(event.target.value),
+                          points: Number(event.target.value)
+                        })}
+                      />
+                    </div>
+
+                    <div className="formRow">
+                      <label>Intent</label>
+                      <input
+                        value={avenue.intent || ''}
+                        onChange={(event) => updateAvenue(scene.sceneId, avenue.avenueId, { intent: event.target.value })}
+                        placeholder="What this option represents"
+                      />
+                    </div>
+
+                    <div className="formRow">
+                      <label>Keywords</label>
+                      <input
+                        value={getKeywordInputValue(scene.sceneId, avenue.avenueId, avenue.keywords)}
+                        onChange={(event) => handleKeywordInputChange(scene.sceneId, avenue.avenueId, event.target.value)}
+                        onBlur={() => handleKeywordInputBlur(scene.sceneId, avenue.avenueId)}
+                        placeholder="sword, magic, shield"
+                      />
+                    </div>
+
+                    <div className="formRow">
+                      <label>Next Scene</label>
+                      <select
+                        value={avenue.nextSceneId}
+                        onChange={(event) => updateAvenue(scene.sceneId, avenue.avenueId, { nextSceneId: event.target.value })}
+                      >
+                        {editedGame.scenes.map((s) => (
+                          <option key={s.sceneId} value={s.sceneId}>{s.sceneId}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="row" style={{ justifyContent: 'flex-end' }}>
+                      <button type="button" onClick={() => removeAvenue(scene.sceneId, avenue.avenueId)} className="delete-btn">
+                        Remove Option
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        ))}
+      </div>
 
       {updateMutation.error && (
         <p className="error" role="alert">

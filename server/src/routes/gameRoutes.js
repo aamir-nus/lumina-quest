@@ -1,89 +1,45 @@
 import express from 'express';
 import mongoose from 'mongoose';
-import { z } from 'zod';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { GameTemplate } from '../models/GameTemplate.js';
 import { validatePublishability } from '../utils/validateGameTemplate.js';
 import { ApiError } from '../errors/ApiError.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
-import { generateGameFromStory } from '../services/gameGeneratorService.js';
+import {
+  createGameSchema,
+  generateFlowSchema,
+  generateOptionsSchema
+} from '../schemas/gameSchemas.js';
+import { normalizeGameTemplate } from '../services/gameTemplateNormalizer.js';
+import { generateGameFlow } from '../services/gameFlowGenerationService.js';
+import { generateGameOptions } from '../services/gameOptionGenerationService.js';
 
 const router = express.Router();
-
-const avenueSchema = z.object({
-  avenueId: z.string().min(1),
-  label: z.string().min(1),
-  keywords: z.array(z.string()).default([]),
-  points: z.number(),
-  nextSceneId: z.string().min(1),
-  visualEffects: z
-    .object({
-      transition: z.string().default('fade'),
-      spriteMood: z.string().default(''),
-      setTheme: z.string().default(''),
-      enableLayers: z.array(z.string()).default([]),
-      disableLayers: z.array(z.string()).default([])
-    })
-    .default({
-      transition: 'fade',
-      spriteMood: '',
-      setTheme: '',
-      enableLayers: [],
-      disableLayers: []
-    })
-});
-
-const sceneSchema = z.object({
-  sceneId: z.string().min(1),
-  narrative: z.string().min(1),
-  imageKey: z.string().default(''),
-  isTerminal: z.boolean().default(false),
-  renderConfig: z
-    .object({
-      theme: z.string().default('pastel'),
-      backgroundLayers: z.array(z.string()).default([]),
-      foregroundLayers: z.array(z.string()).default([]),
-      sprite: z
-        .object({
-          id: z.string().default('hero'),
-          mood: z.string().default('neutral'),
-          x: z.number().default(0.5),
-          y: z.number().default(0.82)
-        })
-        .default({ id: 'hero', mood: 'neutral', x: 0.5, y: 0.82 })
-    })
-    .default({
-      theme: 'pastel',
-      backgroundLayers: [],
-      foregroundLayers: [],
-      sprite: { id: 'hero', mood: 'neutral', x: 0.5, y: 0.82 }
-    }),
-  avenues: z.array(avenueSchema)
-});
-
-const gameSchema = z.object({
-  title: z.string().min(1),
-  description: z.string().optional().default(''),
-  constraints: z.object({
-    maxTurns: z.number().min(1),
-    targetPoints: z.number().min(0)
-  }),
-  wildcardConfig: z
-    .object({
-      enabled: z.boolean().default(false),
-      recoverySceneId: z.string().default(''),
-      highRewardPoints: z.number().default(2),
-      lowRewardPoints: z.number().default(0)
-    })
-    .default({ enabled: false, recoverySceneId: '', highRewardPoints: 2, lowRewardPoints: 0 }),
-  startSceneId: z.string().min(1),
-  scenes: z.array(sceneSchema).min(1)
-});
 
 function getPagination(query) {
   const page = Math.max(1, Number(query.page || 1));
   const limit = Math.min(100, Math.max(1, Number(query.limit || 20)));
   return { page, limit, skip: (page - 1) * limit };
+}
+
+async function saveGameWithFallback(executor) {
+  try {
+    const mongoSession = await mongoose.startSession();
+    try {
+      let value = null;
+      await mongoSession.withTransaction(async () => {
+        value = await executor(mongoSession);
+      });
+      return value;
+    } finally {
+      await mongoSession.endSession();
+    }
+  } catch (error) {
+    if (error.message.includes('Transaction numbers are only allowed on a replica set')) {
+      return await executor(null);
+    }
+    throw error;
+  }
 }
 
 router.get('/public', asyncHandler(async (_req, res) => {
@@ -92,7 +48,7 @@ router.get('/public', asyncHandler(async (_req, res) => {
     GameTemplate.find({ status: 'public' }).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
     GameTemplate.countDocuments({ status: 'public' })
   ]);
-  return res.json({ games, pagination: { page, limit, total } });
+  return res.json({ games: games.map(normalizeGameTemplate), pagination: { page, limit, total } });
 }));
 
 router.use(requireAuth);
@@ -103,37 +59,21 @@ router.get('/mine', asyncHandler(async (req, res) => {
     GameTemplate.find({ adminId: req.user.id }).sort({ updatedAt: -1 }).skip(skip).limit(limit).lean(),
     GameTemplate.countDocuments({ adminId: req.user.id })
   ]);
-  return res.json({ games, pagination: { page, limit, total } });
+  return res.json({ games: games.map(normalizeGameTemplate), pagination: { page, limit, total } });
 }));
 
 router.post('/', requireRole('admin'), asyncHandler(async (req, res) => {
-  const parsed = gameSchema.safeParse(req.body);
+  const parsed = createGameSchema.safeParse(req.body);
   if (!parsed.success) {
     throw new ApiError(400, 'INVALID_GAME_PAYLOAD', 'Invalid game payload', parsed.error.flatten());
   }
 
-  //try transaction, fall back to non-transactional for standalone mongoDB
-  let game;
-  try {
-    const mongoSession = await mongoose.startSession();
-    try {
-      await mongoSession.withTransaction(async () => {
-        game = new GameTemplate({ ...parsed.data, adminId: req.user.id });
-        await game.save({ session: mongoSession });
-      });
-    } finally {
-      await mongoSession.endSession();
-    }
-  } catch (error) {
-    if (error.message.includes('Transaction numbers are only allowed on a replica set')) {
-      // Standalone MongoDB - save without transaction
-      game = new GameTemplate({ ...parsed.data, adminId: req.user.id });
-      await game.save();
-    } else {
-      throw error;
-    }
-  }
-  return res.status(201).json({ game });
+  const game = await saveGameWithFallback(async (mongoSession) => {
+    const document = new GameTemplate({ ...parsed.data, adminId: req.user.id });
+    await document.save(mongoSession ? { session: mongoSession } : undefined);
+    return document;
+  });
+  return res.status(201).json({ game: normalizeGameTemplate(game) });
 }));
 
 router.put('/:id', requireRole('admin'), asyncHandler(async (req, res) => {
@@ -141,86 +81,124 @@ router.put('/:id', requireRole('admin'), asyncHandler(async (req, res) => {
     throw new ApiError(400, 'INVALID_GAME_ID', 'Invalid game id');
   }
 
-  const parsed = gameSchema.safeParse(req.body);
+  const parsed = createGameSchema.safeParse(req.body);
   if (!parsed.success) {
     throw new ApiError(400, 'INVALID_GAME_PAYLOAD', 'Invalid game payload', parsed.error.flatten());
   }
-
-  // Try transaction, fall back to non-transactional for standalone MongoDB
-  let game = null;
-  try {
-    const mongoSession = await mongoose.startSession();
-    try {
-      await mongoSession.withTransaction(async () => {
-        game = await GameTemplate.findOneAndUpdate(
-          { _id: req.params.id, adminId: req.user.id },
-          { ...parsed.data, status: 'draft' },
-          { new: true, session: mongoSession }
-        );
-      });
-    } finally {
-      await mongoSession.endSession();
-    }
-  } catch (error) {
-    if (error.message.includes('Transaction numbers are only allowed on a replica set')) {
-      // Standalone MongoDB - update without transaction
-      game = await GameTemplate.findOneAndUpdate(
-        { _id: req.params.id, adminId: req.user.id },
-        { ...parsed.data, status: 'draft' },
-        { new: true }
-      );
-    } else {
-      throw error;
-    }
-  }
+  const game = await saveGameWithFallback((mongoSession) => GameTemplate.findOneAndUpdate(
+    { _id: req.params.id, adminId: req.user.id },
+    { ...parsed.data, status: 'draft' },
+    mongoSession ? { new: true, session: mongoSession } : { new: true }
+  ));
 
   if (!game) {
     throw new ApiError(404, 'GAME_NOT_FOUND', 'Game not found');
   }
 
-  return res.json({ game });
+  return res.json({ game: normalizeGameTemplate(game) });
 }));
 
-router.post('/generate', requireRole('admin'), asyncHandler(async (req, res) => {
-  const generateSchema = z.object({
-    title: z.string().min(1).max(100),
-    description: z.string().max(500).optional(),
-    story: z.string().min(10).max(2000)
+router.post('/generate-flow', requireRole('admin'), asyncHandler(async (req, res) => {
+  const parsed = generateFlowSchema.safeParse(req.body);
+  if (!parsed.success) {
+    throw new ApiError(400, 'INVALID_GENERATE_FLOW_PAYLOAD', 'Invalid flow payload', parsed.error.flatten());
+  }
+
+  const result = await generateGameFlow(parsed.data);
+  const game = await saveGameWithFallback(async (mongoSession) => {
+    const document = new GameTemplate({ ...result.game, adminId: req.user.id, status: 'draft' });
+    await document.save(mongoSession ? { session: mongoSession } : undefined);
+    return document;
   });
 
-  const parsed = generateSchema.safeParse(req.body);
+  return res.status(201).json({
+    game: normalizeGameTemplate(game),
+    generation: { success: result.success, error: result.error || '' }
+  });
+}));
+
+router.post('/:id/regenerate-flow', requireRole('admin'), asyncHandler(async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    throw new ApiError(400, 'INVALID_GAME_ID', 'Invalid game id');
+  }
+  const existing = await GameTemplate.findOne({ _id: req.params.id, adminId: req.user.id });
+  if (!existing) {
+    throw new ApiError(404, 'GAME_NOT_FOUND', 'Game not found');
+  }
+
+  const baseInput = {
+    title: existing.title,
+    description: existing.description,
+    premise: existing.storyConfig?.premise || existing.description,
+    startGoal: existing.storyConfig?.startGoal || existing.scenes[0]?.goalSummary || 'Begin the story',
+    endGoal: existing.storyConfig?.endGoal || 'Reach a satisfying ending',
+    tone: existing.storyConfig?.tone || 'cinematic',
+    difficulty: existing.storyConfig?.difficulty || 'easy'
+  };
+
+  const result = await generateGameFlow(baseInput);
+  const game = await saveGameWithFallback((mongoSession) => GameTemplate.findOneAndUpdate(
+    { _id: req.params.id, adminId: req.user.id },
+    { ...result.game, adminId: req.user.id, status: 'draft' },
+    mongoSession ? { new: true, session: mongoSession } : { new: true }
+  ));
+
+  return res.json({
+    game: normalizeGameTemplate(game),
+    generation: { success: result.success, error: result.error || '' }
+  });
+}));
+
+router.post('/:id/generate-options', requireRole('admin'), asyncHandler(async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    throw new ApiError(400, 'INVALID_GAME_ID', 'Invalid game id');
+  }
+  const parsed = generateOptionsSchema.safeParse(req.body || {});
   if (!parsed.success) {
-    throw new ApiError(400, 'INVALID_GENERATE_PAYLOAD', 'Invalid generate payload', parsed.error.flatten());
+    throw new ApiError(400, 'INVALID_GENERATE_OPTIONS_PAYLOAD', 'Invalid options payload', parsed.error.flatten());
   }
-
-  const result = await generateGameFromStory(parsed.data);
-
-  if (!result.success) {
-    throw new ApiError(500, 'GENERATION_FAILED', result.error || 'Failed to generate game');
+  const existing = await GameTemplate.findOne({ _id: req.params.id, adminId: req.user.id });
+  if (!existing) {
+    throw new ApiError(404, 'GAME_NOT_FOUND', 'Game not found');
   }
+  const result = await generateGameOptions(existing, parsed.data.sceneIds);
+  const game = await saveGameWithFallback((mongoSession) => GameTemplate.findOneAndUpdate(
+    { _id: req.params.id, adminId: req.user.id },
+    { ...result.game, status: 'draft' },
+    mongoSession ? { new: true, session: mongoSession } : { new: true }
+  ));
 
-  // Save generated game as draft
-  let game;
-  try {
-    const mongoSession = await mongoose.startSession();
-    try {
-      await mongoSession.withTransaction(async () => {
-        game = new GameTemplate({ ...result.game, adminId: req.user.id, status: 'draft' });
-        await game.save({ session: mongoSession });
-      });
-    } finally {
-      await mongoSession.endSession();
+  return res.json({
+    game: normalizeGameTemplate(game),
+    generation: {
+      success: result.success,
+      pendingSceneIds: normalizeGameTemplate(game).generationState.pendingSceneIds
     }
-  } catch (error) {
-    if (error.message.includes('Transaction numbers are only allowed on a replica set')) {
-      game = new GameTemplate({ ...result.game, adminId: req.user.id, status: 'draft' });
-      await game.save();
-    } else {
-      throw error;
-    }
-  }
+  });
+}));
 
-  return res.status(201).json({ game });
+router.post('/:id/scenes/:sceneId/generate-options', requireRole('admin'), asyncHandler(async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    throw new ApiError(400, 'INVALID_GAME_ID', 'Invalid game id');
+  }
+  const existing = await GameTemplate.findOne({ _id: req.params.id, adminId: req.user.id });
+  if (!existing) {
+    throw new ApiError(404, 'GAME_NOT_FOUND', 'Game not found');
+  }
+  const result = await generateGameOptions(existing, [req.params.sceneId]);
+  const game = await saveGameWithFallback((mongoSession) => GameTemplate.findOneAndUpdate(
+    { _id: req.params.id, adminId: req.user.id },
+    { ...result.game, status: 'draft' },
+    mongoSession ? { new: true, session: mongoSession } : { new: true }
+  ));
+
+  return res.json({
+    game: normalizeGameTemplate(game),
+    generation: {
+      success: result.success,
+      pendingSceneIds: normalizeGameTemplate(game).generationState.pendingSceneIds
+    }
+  });
 }));
 
 router.post('/:id/publish', requireRole('admin'), asyncHandler(async (req, res) => {
@@ -228,48 +206,55 @@ router.post('/:id/publish', requireRole('admin'), asyncHandler(async (req, res) 
     throw new ApiError(400, 'INVALID_GAME_ID', 'Invalid game id');
   }
 
-  // Try transaction, fall back to non-transactional for standalone MongoDB
-  let game = null;
-  try {
-    const mongoSession = await mongoose.startSession();
-    try {
-      await mongoSession.withTransaction(async () => {
-        game = await GameTemplate.findOne({ _id: req.params.id, adminId: req.user.id }).session(mongoSession);
-        if (!game) {
-          throw new ApiError(404, 'GAME_NOT_FOUND', 'Game not found');
-        }
-
-        const result = validatePublishability(game);
-        if (!result.ok) {
-          throw new ApiError(400, 'GAME_NOT_PUBLISHABLE', 'Game is not publishable', result.errors);
-        }
-
-        game.status = 'public';
-        await game.save({ session: mongoSession });
-      });
-    } finally {
-      await mongoSession.endSession();
+  const game = await saveGameWithFallback(async (mongoSession) => {
+    const query = GameTemplate.findOne({ _id: req.params.id, adminId: req.user.id });
+    const doc = mongoSession ? await query.session(mongoSession) : await query;
+    if (!doc) {
+      throw new ApiError(404, 'GAME_NOT_FOUND', 'Game not found');
     }
-  } catch (error) {
-    if (error.message.includes('Transaction numbers are only allowed on a replica set')) {
-      // Standalone MongoDB - publish without transaction
-      game = await GameTemplate.findOne({ _id: req.params.id, adminId: req.user.id });
-      if (!game) {
-        throw new ApiError(404, 'GAME_NOT_FOUND', 'Game not found');
-      }
 
-      const result = validatePublishability(game);
-      if (!result.ok) {
-        throw new ApiError(400, 'GAME_NOT_PUBLISHABLE', 'Game is not publishable', result.errors);
-      }
-
-      game.status = 'public';
-      await game.save();
-    } else {
-      throw error;
+    const result = validatePublishability(doc);
+    if (!result.ok) {
+      throw new ApiError(400, 'GAME_NOT_PUBLISHABLE', 'Game is not publishable', result.errors);
     }
+
+    doc.status = 'public';
+    await doc.save(mongoSession ? { session: mongoSession } : undefined);
+    return doc;
+  });
+
+  return res.json({ game: normalizeGameTemplate(game) });
+}));
+
+router.post('/generate', requireRole('admin'), asyncHandler(async (req, res) => {
+  const parsed = generateFlowSchema.safeParse({
+    title: req.body?.title,
+    description: req.body?.description || '',
+    premise: req.body?.story || req.body?.premise,
+    startGoal: req.body?.startGoal || 'Begin the adventure',
+    endGoal: req.body?.endGoal || 'Reach the ending',
+    tone: req.body?.tone || 'cinematic',
+    difficulty: req.body?.difficulty || 'easy'
+  });
+  if (!parsed.success) {
+    throw new ApiError(400, 'INVALID_GENERATE_PAYLOAD', 'Invalid generate payload', parsed.error.flatten());
   }
-  return res.json({ game });
+
+  const flowResult = await generateGameFlow(parsed.data);
+  const optionsResult = await generateGameOptions(flowResult.game);
+  const game = await saveGameWithFallback(async (mongoSession) => {
+    const document = new GameTemplate({ ...optionsResult.game, adminId: req.user.id, status: 'draft' });
+    await document.save(mongoSession ? { session: mongoSession } : undefined);
+    return document;
+  });
+
+  return res.status(201).json({
+    game: normalizeGameTemplate(game),
+    generation: {
+      success: flowResult.success && optionsResult.success,
+      pendingSceneIds: normalizeGameTemplate(game).generationState.pendingSceneIds
+    }
+  });
 }));
 
 router.delete('/:id', requireRole('admin'), asyncHandler(async (req, res) => {

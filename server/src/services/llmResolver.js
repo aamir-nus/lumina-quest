@@ -9,11 +9,12 @@ import {
   recordProviderError,
   recordRouteType
 } from './resolverMetricsService.js';
+import { withLlmTimeout } from './lmStudioService.js';
 
 function getProviderConfig() {
-  console.log('[LLM_RESOLVER] 🔧 Getting provider config...');
+  logger.info('[LLM_RESOLVER] 🔧 Getting provider config...');
   if (env.llmProvider === 'lmstudio') {
-    console.log(`[LLM_RESOLVER] ✅ Using LMStudio: ${env.lmStudioBaseUrl} | Model: ${env.lmStudioModel}`);
+    logger.info('[LLM_RESOLVER] ✅ Using LMStudio', { baseUrl: env.lmStudioBaseUrl, model: env.lmStudioModel });
     return {
       provider: 'lmstudio',
       apiKey: env.lmStudioApiKey || 'lm-studio',
@@ -24,7 +25,7 @@ function getProviderConfig() {
     };
   }
 
-  console.log(`[LLM_RESOLVER] ✅ Using OpenRouter | Model: ${env.openRouterModel}`);
+  logger.info('[LLM_RESOLVER] ✅ Using OpenRouter', { model: env.openRouterModel });
   return {
     provider: 'openrouter',
     apiKey: env.openRouterApiKey || 'missing-key',
@@ -139,7 +140,7 @@ function captureComputeEnd(provider, start) {
   return sample;
 }
 
-function heuristicClassify({ input, avenues }) {
+function heuristicClassify({ input, avenues, mode = 'legacy' }) {
   const normalized = input.toLowerCase();
   const matched = avenues.find((avenue) => {
     const labelHit = normalized.includes(avenue.label.toLowerCase());
@@ -158,10 +159,21 @@ function heuristicClassify({ input, avenues }) {
 
   if (normalized.length < 6) {
     return {
-      routeType: 'clarification',
+      routeType: mode === 'authored-only' ? 'no_match' : 'clarification',
       avenueId: null,
       confidence: 0.3,
-      explanation: 'Input is too short to resolve confidently.'
+      explanation: mode === 'authored-only'
+        ? 'Input does not clearly match any authored route.'
+        : 'Input is too short to resolve confidently.'
+    };
+  }
+
+  if (mode === 'authored-only') {
+    return {
+      routeType: 'no_match',
+      avenueId: null,
+      confidence: 0.18,
+      explanation: 'No authored route matched this input.'
     };
   }
 
@@ -175,19 +187,30 @@ function heuristicClassify({ input, avenues }) {
 }
 
 /**
- * Classify player input into an authored avenue, bounded wildcard, or clarification.
+ * Classify player input into an authored avenue, bounded wildcard, no_match, or clarification.
  */
-export async function classifyRoute({ gameTitle, sceneNarrative, input, avenues, history, wildcardEnabled }) {
-  console.log('[LLM_CLASSIFY] 🎯 Starting classification...');
-  console.log(`[LLM_CLASSIFY] 📖 Input: "${input}"`);
-  console.log(`[LLM_CLASSIFY] 📍 Available avenues: ${avenues.map(a => a.label).join(', ')}`);
+export async function classifyRoute({ gameTitle, sceneNarrative, input, avenues, history, wildcardEnabled, mode = 'legacy' }) {
+  logger.info('[LLM_CLASSIFY] 🎯 Starting classification...', { input, avenueCount: avenues.length });
 
   const { provider, client } = createClient();
   const fallbackAvenue = avenues[0]?.avenueId || null;
-  const heuristic = heuristicClassify({ input, avenues });
+  const heuristic = heuristicClassify({ input, avenues, mode });
+
+  if (mode === 'authored-only' && provider.provider !== 'lmstudio') {
+    logger.warn('[LLM_CLASSIFY] ⛔ Refusing non-LMStudio provider for authored-only mode');
+    recordProviderError();
+    recordRouteType('no_match');
+    return {
+      ...heuristic,
+      provider: provider.provider,
+      usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+      computeApprox: null,
+      providerResponse: mockResponse({ ...heuristic, reason: 'lmstudio_required' })
+    };
+  }
 
   if (!provider.hasApiKey) {
-    console.log('[LLM_CLASSIFY] ⚠️ No API key - using heuristic fallback');
+    logger.warn('[LLM_CLASSIFY] ⚠️ No API key - using heuristic fallback');
     recordMockResponse();
     recordRouteType(heuristic.routeType);
     recordLlmUsage({ inputTokens: 0, outputTokens: 0, totalTokens: 0 });
@@ -200,7 +223,7 @@ export async function classifyRoute({ gameTitle, sceneNarrative, input, avenues,
     };
   }
 
-  console.log('[LLM_CLASSIFY] 🔄 Calling LLM provider...');
+  logger.info('[LLM_CLASSIFY] 🔄 Calling LLM provider...');
   const prompt = [
     `Game: ${gameTitle}`,
     `Scene: ${sceneNarrative}`,
@@ -214,6 +237,7 @@ export async function classifyRoute({ gameTitle, sceneNarrative, input, avenues,
     )}`,
     `Avenues: ${JSON.stringify(avenues.map((a) => ({ avenueId: a.avenueId, label: a.label, keywords: a.keywords })))}`,
     `Wildcard enabled: ${wildcardEnabled}`,
+    `Mode: ${mode}`,
     '',
     'CONFIDENCE CALIBRATION GUIDELINES (use these as your reference):',
     '• 0.9-1.0: ONLY for exact keyword/phrase matches (user says exact avenue label or keyword)',
@@ -225,52 +249,55 @@ export async function classifyRoute({ gameTitle, sceneNarrative, input, avenues,
     'Be conservative with your confidence scores. When in doubt, choose a lower value.',
     '',
     'Return strict JSON only with this shape:',
-    '{"routeType":"avenue|wildcard|clarification","avenueId":"<id>|null","confidence":0-1,"explanation":"short","wildcard":{"mode":"high-reward|low-reward","destinationSceneId":"optional"}}',
+    '{"routeType":"avenue|wildcard|clarification|no_match","avenueId":"<id>|null","confidence":0-1,"explanation":"short","wildcard":{"mode":"high-reward|low-reward","destinationSceneId":"optional"}}',
     'Never invent avenue IDs.'
   ].join('\n');
 
   try {
     const computeStart = captureComputeStart();
-    const response = await client.responses.create({
-      model: provider.model,
-      input: [
-        {
-          role: 'system',
-          content: [
-            {
-              type: 'input_text',
-              text: 'Classify player input into avenue, wildcard, or clarification for a deterministic story graph.'
-            }
-          ]
-        },
-        {
-          role: 'user',
-          content: [{ type: 'input_text', text: prompt }]
-        }
-      ]
-    });
+    const response = await withLlmTimeout(
+      client.responses.create({
+        model: provider.model,
+        input: [
+          {
+            role: 'system',
+            content: [
+              {
+                type: 'input_text',
+                text: 'Classify player input into avenue, wildcard, or clarification for a deterministic story graph.'
+              }
+            ]
+          },
+          {
+            role: 'user',
+            content: [{ type: 'input_text', text: prompt }]
+          }
+        ]
+      }),
+      15000,
+      'classify_route'
+    );
 
-    console.log('[LLM_CLASSIFY] ✅ Got LLM response, parsing...');
+    logger.info('[LLM_CLASSIFY] ✅ Got LLM response, parsing...');
     const parsed = parseOutput(response, heuristic);
     const usage = parseUsage(response);
     const computeApprox = captureComputeEnd(provider.provider, computeStart);
     recordLlmUsage(usage);
 
-    // DEBUG: Log what we actually got from the LLM
-    console.log('[LLM_CLASSIFY] 🔍 Raw parsed result:', JSON.stringify(parsed, null, 2));
-    console.log('[LLM_CLASSIFY] 🔍 Heuristic fallback would be:', JSON.stringify(heuristic, null, 2));
+    logger.info('[LLM_CLASSIFY] 🔍 Raw parsed result', { parsed });
+    logger.info('[LLM_CLASSIFY] 🔍 Heuristic fallback would be', { heuristic });
 
-    const routeType = ['avenue', 'wildcard', 'clarification'].includes(parsed.routeType)
+    const routeType = ['avenue', 'wildcard', 'clarification', 'no_match'].includes(parsed.routeType)
       ? parsed.routeType
       : heuristic.routeType;
     const validAvenue = avenues.some((a) => a.avenueId === parsed.avenueId);
-    const avenueId = validAvenue ? parsed.avenueId : fallbackAvenue;
+    const avenueId = validAvenue ? parsed.avenueId : routeType === 'avenue' ? fallbackAvenue : null;
 
-    console.log(`[LLM_CLASSIFY] 📊 Result: routeType=${routeType}, avenueId=${avenueId}, confidence=${parsed.confidence || heuristic.confidence || 0.5}`);
-    console.log(`[LLM_CLASSIFY] ⏱️  Latency: ${computeApprox.latencyMs.toFixed(1)}ms | Tokens: ${usage.totalTokens}`);
+    logger.info('[LLM_CLASSIFY] 📊 Result', { routeType, avenueId, confidence: parsed.confidence || heuristic.confidence || 0.5 });
+    logger.info('[LLM_CLASSIFY] ⏱️  Latency', { latencyMs: computeApprox.latencyMs.toFixed(1), tokens: usage.totalTokens });
 
     if (!validAvenue && routeType === 'avenue') {
-      console.log('[LLM_CLASSIFY] ⚠️ Invalid avenue ID, using fallback');
+      logger.warn('[LLM_CLASSIFY] ⚠️ Invalid avenue ID, using fallback');
       recordFallback();
     }
     recordRouteType(routeType);
@@ -286,15 +313,15 @@ export async function classifyRoute({ gameTitle, sceneNarrative, input, avenues,
       providerResponse: response
     };
   } catch (error) {
-    console.log(`[LLM_CLASSIFY] ❌ Provider call failed: ${error.message}`);
-    logger.error('Classifier provider call failed', { message: error.message });
+    logger.error('[LLM_CLASSIFY] ❌ Provider call failed', { message: error.message });
+    recordProviderError();
     recordProviderError();
     recordMockResponse();
     recordRouteType(heuristic.routeType);
     recordLlmUsage({ inputTokens: 0, outputTokens: 0, totalTokens: 0 });
     return {
       ...heuristic,
-      avenueId: heuristic.avenueId || fallbackAvenue,
+      avenueId: heuristic.routeType === 'avenue' ? (heuristic.avenueId || fallbackAvenue) : null,
       provider: provider.provider,
       usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
       computeApprox: null,
@@ -307,107 +334,151 @@ export async function classifyRoute({ gameTitle, sceneNarrative, input, avenues,
  * Generate wizard dialogue for game ending based on player performance.
  */
 export async function generateWizardDialogue({ gameTitle, grade, points, targetPoints, turnsUsed, maxTurns, status, choices }) {
-  console.log('[LLM_WIZARD] 🧙 Generating ending dialogue...');
-  console.log(`[LLM_WIZARD] 📊 Grade: ${grade} | Points: ${points}/${targetPoints} | Status: ${status}`);
+  logger.info('[LLM_WIZARD] 🧙 Generating ending dialogue...', { grade, points, targetPoints, status });
 
   const { provider, client } = createClient();
-  const fallbackDialogues = {
-    S: 'Magnificent! Your brilliance shines like a thousand stars! You are a true legend!',
-    A: 'Well done, brave adventurer! Your skills are most impressive!',
-    B: 'A respectable journey! You have proven yourself worthy.',
-    C: 'You survived... barely. Perhaps with more wisdom, next time will be better.',
-    D: 'Ahem. Perhaps adventuring is not your calling? Have you considered... farming?'
+
+  // Sharper personality-based fallback dialogues
+  const getFallbackDialogue = () => {
+    if (status === 'won') {
+      if (grade === 'S') return 'LEGENDARY! The stars themselves bow to your brilliance! You are truly chosen!';
+      if (grade === 'A') return 'Outstanding! Your potential is limitless. I sense great destinies ahead for you!';
+      if (grade === 'B') return 'You won. Competently. I suppose that counts for something these days.';
+    }
+    if (grade === 'C') return 'You survived. I\'ve seen slimes with better survival instincts, but... congrats?';
+    return 'Pathetic. My cauldron has more talent than you. Perhaps try a game with... less thinking?';
   };
 
   if (!provider.hasApiKey) {
-    console.log('[LLM_WIZARD] ⚠️ No API key - using fallback');
+    logger.warn('[LLM_WIZARD] ⚠️ No API key - using fallback');
     recordMockResponse();
     recordLlmUsage({ inputTokens: 0, outputTokens: 0, totalTokens: 0 });
     return {
-      dialogue: fallbackDialogues[grade] || fallbackDialogues.C,
+      dialogue: getFallbackDialogue(),
       provider: provider.provider,
       usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
       computeApprox: null,
-      providerResponse: mockResponse({ dialogue: fallbackDialogues[grade] || fallbackDialogues.C, reason: 'mock_no_api_key' })
+      providerResponse: mockResponse({ dialogue: getFallbackDialogue(), reason: 'mock_no_api_key' })
     };
   }
 
   // Format choices for the prompt
   const choicesSummary = choices.map((c, i) => `${i + 1}. "${c.userQuery}" → ${c.resolvedAvenueId || 'wildcard'} (${c.pointsDelta >= 0 ? '+' : ''}${c.pointsDelta} pts)`).join('\n');
 
-  const tone = grade === 'S' || grade === 'A' ? 'praising and enthusiastic' :
-               grade === 'B' ? 'respectful and encouraging' :
-               grade === 'C' ? 'sympathetic but constructive' :
-               'teasing and humorous (suggesting a different career)';
+  // Define wizard personalities based on grade and outcome
+  const getWizardPersonality = () => {
+    if (status === 'won') {
+      if (grade === 'S' || grade === 'A') {
+        return {
+          persona: 'HOPEFUL WIZARD',
+          tone: 'ecstatic, reverent, almost weeping with joy',
+          traits: 'believes the player is the chosen one, sees limitless potential, dramatic and flowery language',
+          examples: 'speak like a mystic who has witnessed a prophecy fulfilled, use exclamation marks, reference stars/destiny'
+        };
+      }
+      if (grade === 'B') {
+        return {
+          persona: 'CYNIC WIZARD',
+          tone: 'dry, unimpressed, mildly disappointed',
+          traits: 'seen thousands of heroes, player is merely adequate, backhanded compliments',
+          examples: 'speak like someone who expects better, use phrases like "I suppose" and "adequate", subtle sarcasm'
+        };
+      }
+    }
+    if (grade === 'C') {
+      return {
+        persona: 'CYNIC WIZARD',
+        tone: 'disappointed, mocking, unimpressed',
+        traits: 'surprised the player survived at all, condescending',
+        examples: 'compare player unfavorably to slimes or goblins, express surprise at basic competence'
+      };
+    }
+    return {
+      persona: 'HARSH MASTER',
+      tone: 'insulting, dismissive, cruel',
+      traits: 'openly mocks player\'s intelligence, suggests they should quit adventuring',
+      examples: 'suggest farming or alchemy as better career paths, question their life choices, biting sarcasm'
+    };
+  };
+
+  const personality = getWizardPersonality();
 
   const prompt = [
-    `You are an 8-bit wizard NPC giving ending dialogue to a player who just completed a text adventure game.`,
+    `You are an 8-bit wizard NPC with a DISTINCT PERSONALITY giving ending dialogue to a player.`,
+    '',
+    `WIZARD PERSONALITY: ${personality.persona}`,
+    `Tone: ${personality.tone}`,
+    `Traits: ${personality.traits}`,
+    `Style Examples: ${personality.examples}`,
     '',
     `Game: ${gameTitle}`,
     `Player Performance:`,
     `- Grade: ${grade}`,
     `- Points: ${points} / Target: ${targetPoints}`,
     `- Turns: ${turnsUsed} / Max: ${maxTurns}`,
-    `- Result: ${status}`,
+    `- Result: ${status === 'won' ? 'VICTORY' : 'DEFEAT'}`,
     '',
     `Player Choices:\n${choicesSummary || 'No choices recorded'}`,
     '',
-    `Tone: ${tone}`,
-    '',
-    `Generate a SHORT, witty 1-2 sentence response (max 30 words) that:`,
-    `- Matches the tone for their grade`,
-    `- References their performance in a clever way`,
-    `- Stays in character as an 8-bit wizard`,
-    `- Is memorable and fun`,
+    `Generate a SHORT, SHARP response (max 25 words) that:`,
+    `- EMBODIES your specific personality type (${personality.persona})`,
+    `- Is MEMORABLE and leaves a strong impression`,
+    `- References their grade (${grade}) and result (${status})`,
+    `- Uses dramatic language appropriate to your personality`,
     '',
     `Return strict JSON only: {"dialogue":"short response"}`
   ].join('\n');
 
   try {
-    console.log('[LLM_WIZARD] 🔄 Calling LLM provider...');
+    logger.info('[LLM_WIZARD] 🔄 Calling LLM provider...');
     const computeStart = captureComputeStart();
-    const response = await client.responses.create({
-      model: provider.model,
-      input: [
-        {
-          role: 'system',
-          content: [{ type: 'input_text', text: 'You are a witty 8-bit wizard NPC who gives memorable ending dialogues based on player performance.' }]
-        },
-        {
-          role: 'user',
-          content: [{ type: 'input_text', text: prompt }]
-        }
-      ]
-    });
+    const response = await withLlmTimeout(
+      client.responses.create({
+        model: provider.model,
+        input: [
+          {
+            role: 'system',
+            content: [{ type: 'input_text', text: `You are an 8-bit wizard NPC with one of three personalities: HOPEFUL (for excellent grades), CYNIC (for mediocre grades), or HARSH MASTER (for failures). Stay strictly in character.` }]
+          },
+          {
+            role: 'user',
+            content: [{ type: 'input_text', text: prompt }]
+          }
+        ]
+      }),
+      15000,
+      'wizard_dialogue'
+    );
 
-    console.log('[LLM_WIZARD] ✅ Got LLM response, parsing...');
-    const parsed = parseOutput(response, { dialogue: fallbackDialogues[grade] || fallbackDialogues.C });
+    logger.info('[LLM_WIZARD] ✅ Got LLM response, parsing...');
+    const parsed = parseOutput(response, { dialogue: getFallbackDialogue() });
     const usage = parseUsage(response);
     const computeApprox = captureComputeEnd(provider.provider, computeStart);
     recordLlmUsage(usage);
 
-    console.log(`[LLM_WIZARD] 📖 Dialogue: "${parsed.dialogue?.substring(0, 50)}..."`);
-    console.log(`[LLM_WIZARD] ⏱️  Latency: ${computeApprox.latencyMs.toFixed(1)}ms | Tokens: ${usage.totalTokens}`);
+    logger.info('[LLM_WIZARD] 📖 Dialogue', { dialogue: parsed.dialogue?.substring(0, 50) });
+    logger.info('[LLM_WIZARD] ⏱️  Latency', { latencyMs: computeApprox.latencyMs.toFixed(1), tokens: usage.totalTokens });
 
     return {
-      dialogue: parsed.dialogue || fallbackDialogues[grade] || fallbackDialogues.C,
+      dialogue: parsed.dialogue || getFallbackDialogue(),
       provider: provider.provider,
       usage,
       computeApprox,
       providerResponse: response
     };
   } catch (error) {
-    console.log(`[LLM_WIZARD] ❌ Provider call failed: ${error.message}`);
-    logger.error('Wizard dialogue provider call failed', { message: error.message });
+    logger.error('[LLM_WIZARD] ❌ Provider call failed', { message: error.message });
+    recordProviderError();
     recordProviderError();
     recordMockResponse();
     recordLlmUsage({ inputTokens: 0, outputTokens: 0, totalTokens: 0 });
+    const fallback = getFallbackDialogue();
     return {
-      dialogue: fallbackDialogues[grade] || fallbackDialogues.C,
+      dialogue: fallback,
       provider: provider.provider,
       usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
       computeApprox: null,
-      providerResponse: mockResponse({ dialogue: fallbackDialogues[grade] || fallbackDialogues.C, reason: 'mock_provider_error' })
+      providerResponse: mockResponse({ dialogue: fallback, reason: 'mock_provider_error' })
     };
   }
 }
@@ -423,14 +494,13 @@ export async function generateNarration({
   routeLabel,
   tone = 'cinematic'
 }) {
-  console.log('[LLM_NARRATE] ✍️  Generating narration...');
-  console.log(`[LLM_NARRATE] 📝 Resolution: ${resolutionType} | Route: ${routeLabel || 'n/a'} | Tone: ${tone}`);
+  logger.info('[LLM_NARRATE] ✍️  Generating narration...', { resolutionType, routeLabel, tone });
 
   const { provider, client } = createClient();
   const fallbackText = `Action resolved as ${resolutionType}${routeLabel ? ` (${routeLabel})` : ''}.`;
 
   if (!provider.hasApiKey) {
-    console.log('[LLM_NARRATE] ⚠️ No API key - using fallback');
+    logger.warn('[LLM_NARRATE] ⚠️ No API key - using fallback');
     recordMockResponse();
     recordLlmUsage({ inputTokens: 0, outputTokens: 0, totalTokens: 0 });
     return {
@@ -453,30 +523,34 @@ export async function generateNarration({
   ].join('\n');
 
   try {
-    console.log('[LLM_NARRATE] 🔄 Calling LLM provider...');
+    logger.info('[LLM_NARRATE] 🔄 Calling LLM provider...');
     const computeStart = captureComputeStart();
-    const response = await client.responses.create({
-      model: provider.model,
-      input: [
-        {
-          role: 'system',
-          content: [{ type: 'input_text', text: 'Narrate approved game outcomes. Keep concise and vivid.' }]
-        },
-        {
-          role: 'user',
-          content: [{ type: 'input_text', text: prompt }]
-        }
-      ]
-    });
+    const response = await withLlmTimeout(
+      client.responses.create({
+        model: provider.model,
+        input: [
+          {
+            role: 'system',
+            content: [{ type: 'input_text', text: 'Narrate approved game outcomes. Keep concise and vivid.' }]
+          },
+          {
+            role: 'user',
+            content: [{ type: 'input_text', text: prompt }]
+          }
+        ]
+      }),
+      15000,
+      'generate_narration'
+    );
 
-    console.log('[LLM_NARRATE] ✅ Got LLM response, parsing...');
+    logger.info('[LLM_NARRATE] ✅ Got LLM response, parsing...');
     const parsed = parseOutput(response, { text: fallbackText });
     const usage = parseUsage(response);
     const computeApprox = captureComputeEnd(provider.provider, computeStart);
     recordLlmUsage(usage);
 
-    console.log(`[LLM_NARRATE] 📖 Narration: "${parsed.text?.substring(0, 80)}..."`);
-    console.log(`[LLM_NARRATE] ⏱️  Latency: ${computeApprox.latencyMs.toFixed(1)}ms | Tokens: ${usage.totalTokens}`);
+    logger.info('[LLM_NARRATE] 📖 Narration', { text: parsed.text?.substring(0, 80) });
+    logger.info('[LLM_NARRATE] ⏱️  Latency', { latencyMs: computeApprox.latencyMs.toFixed(1), tokens: usage.totalTokens });
 
     return {
       text: parsed.text || fallbackText,
@@ -486,8 +560,8 @@ export async function generateNarration({
       providerResponse: response
     };
   } catch (error) {
-    console.log(`[LLM_NARRATE] ❌ Provider call failed: ${error.message}`);
-    logger.error('Narration provider call failed', { message: error.message });
+    logger.error('[LLM_NARRATE] ❌ Provider call failed', { message: error.message });
+    recordProviderError();
     recordProviderError();
     recordMockResponse();
     recordLlmUsage({ inputTokens: 0, outputTokens: 0, totalTokens: 0 });

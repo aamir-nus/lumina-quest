@@ -1,5 +1,4 @@
 import express from 'express';
-import mongoose from 'mongoose';
 import { z } from 'zod';
 import { requireAuth } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/asyncHandler.js';
@@ -32,26 +31,17 @@ router.use(requireAuth);
 router.post('/start', asyncHandler(async (req, res) => {
   const parsed = startSchema.safeParse(req.body);
   if (!parsed.success) throw new ApiError(400, 'INVALID_PAYLOAD', 'Invalid payload');
-  if (!mongoose.isValidObjectId(parsed.data.gameId)) throw new ApiError(400, 'INVALID_GAME_ID', 'Invalid gameId');
 
   const session = await startSessionForUser({ userId: req.user.id, gameId: parsed.data.gameId });
   return res.status(201).json({ session });
 }));
 
 router.get('/:sessionId', asyncHandler(async (req, res) => {
-  if (!mongoose.isValidObjectId(req.params.sessionId)) {
-    throw new ApiError(400, 'INVALID_SESSION_ID', 'Invalid sessionId');
-  }
-
   const result = await getSessionSnapshot({ userId: req.user.id, sessionId: req.params.sessionId });
   return res.json(result);
 }));
 
 router.get('/:sessionId/history', asyncHandler(async (req, res) => {
-  if (!mongoose.isValidObjectId(req.params.sessionId)) {
-    throw new ApiError(400, 'INVALID_SESSION_ID', 'Invalid sessionId');
-  }
-
   const history = await getSessionHistory({ userId: req.user.id, sessionId: req.params.sessionId });
   return res.json({ history });
 }));
@@ -59,9 +49,6 @@ router.get('/:sessionId/history', asyncHandler(async (req, res) => {
 const actHandler = asyncHandler(async (req, res) => {
   const parsed = actionSchema.safeParse(req.body);
   if (!parsed.success) throw new ApiError(400, 'INVALID_PAYLOAD', 'Invalid payload');
-  if (!mongoose.isValidObjectId(parsed.data.sessionId)) {
-    throw new ApiError(400, 'INVALID_SESSION_ID', 'Invalid sessionId');
-  }
 
   const result = await processSessionAction({ userId: req.user.id, payload: parsed.data });
   return res.json(result);
@@ -70,10 +57,6 @@ const actHandler = asyncHandler(async (req, res) => {
 router.post('/action', llmActionRateLimiter, actHandler);
 
 router.post('/:sessionId/wizard-dialogue', asyncHandler(async (req, res) => {
-  if (!mongoose.isValidObjectId(req.params.sessionId)) {
-    throw new ApiError(400, 'INVALID_SESSION_ID', 'Invalid sessionId');
-  }
-
   const session = await PlayerSession.findOne({ _id: req.params.sessionId, userId: req.user.id });
   if (!session) throw new ApiError(404, 'SESSION_NOT_FOUND', 'Session not found');
 

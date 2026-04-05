@@ -3,5 +3,5 @@
  */
 export function SceneTransitionOverlay({ transition }) {
   if (!transition) return null;
-  return <div className={`transitionOverlay ${transition}`}>transition: {transition}</div>;
+  return <div className={`transitionOverlay ${transition}`}><span className="sr-only">transition: {transition}</span></div>;
 }
