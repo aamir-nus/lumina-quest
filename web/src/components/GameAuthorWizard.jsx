@@ -55,29 +55,6 @@ export function GameAuthorWizard({ onCancel, onOpenEditor }) {
   const [engagementMessage, setEngagementMessage] = useState(null);
   const messageIntervalRef = useRef(null);
 
-  // Start message cycle during generation
-  useEffect(() => {
-    if (flowMutation.isPending || optionMutation.isPending) {
-      const type = flowMutation.isPending ? 'flow' : 'option';
-      setEngagementMessage(getRandomEngagementMessage(type, form.difficulty));
-      messageIntervalRef.current = setInterval(() => {
-        setEngagementMessage(getRandomEngagementMessage(type, form.difficulty));
-      }, 3000);
-    } else {
-      if (messageIntervalRef.current) {
-        clearInterval(messageIntervalRef.current);
-        messageIntervalRef.current = null;
-      }
-      setEngagementMessage(null);
-    }
-
-    return () => {
-      if (messageIntervalRef.current) {
-        clearInterval(messageIntervalRef.current);
-      }
-    };
-  }, [flowMutation.isPending, optionMutation.isPending, form.difficulty]);
-
   const playableScenes = useMemo(
     () => (draftGame?.scenes || []).filter((scene) => scene.kind !== 'ending'),
     [draftGame]
@@ -118,6 +95,29 @@ export function GameAuthorWizard({ onCancel, onOpenEditor }) {
       setDraftGame(cloneGame(game));
     }
   });
+
+  // Start message cycle during generation (must be after mutations are defined)
+  useEffect(() => {
+    if (flowMutation.isPending || optionMutation.isPending) {
+      const type = flowMutation.isPending ? 'flow' : 'option';
+      setEngagementMessage(getRandomEngagementMessage(type, form.difficulty));
+      messageIntervalRef.current = setInterval(() => {
+        setEngagementMessage(getRandomEngagementMessage(type, form.difficulty));
+      }, 3000);
+    } else {
+      if (messageIntervalRef.current) {
+        clearInterval(messageIntervalRef.current);
+        messageIntervalRef.current = null;
+      }
+      setEngagementMessage(null);
+    }
+
+    return () => {
+      if (messageIntervalRef.current) {
+        clearInterval(messageIntervalRef.current);
+      }
+    };
+  }, [flowMutation.isPending, optionMutation.isPending, form.difficulty]);
 
   return (
     <section className="card">

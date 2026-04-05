@@ -13,9 +13,9 @@ function cloneGame(game) {
 }
 
 function expectedOptionRange(difficulty) {
-  if (difficulty === 'hard') return { min: 4, max: 6 };
-  if (difficulty === 'medium') return { min: 3, max: 5 };
-  return { min: 2, max: 3 };
+  if (difficulty === 'hard') return { min: 1, max: 6 };
+  if (difficulty === 'medium') return { min: 1, max: 5 };
+  return { min: 1, max: 3 };
 }
 
 function parseKeywordInput(value) {
@@ -299,11 +299,9 @@ export function GameEditor({ game, onSave, onCancel }) {
   }, []);
 
   const handleSaveAvenue = useCallback((avenueId, updates) => {
-    const scene = editedGame.scenes.find((s) => s.sceneId === selectedSceneId);
-    if (!scene) return;
-
+    // Use ref to avoid stale closure - updateAvenueRef always has the latest function
     updateAvenueRef.current(selectedSceneId, avenueId, updates);
-  }, [editedGame, selectedSceneId]);
+  }, [selectedSceneId]);
 
   const selectedScene = editedGame.scenes?.find((s) => s.sceneId === selectedSceneId);
 
