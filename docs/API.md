@@ -398,14 +398,15 @@ The API enforces option counts based on difficulty:
 
 | Difficulty | Min Options | Max Options |
 | ---------- | ----------- | ----------- |
-| `easy`     | 2           | 3           |
-| `medium`   | 3           | 5           |
-| `hard`     | 4           | 6           |
+| `easy`     | 1           | 3           |
+| `medium`   | 1           | 5           |
+| `hard`     | 1           | 6           |
 
 **Validation:**
-- Carousel UI enforces max 5 options per scene
+- Carousel UI enforces max 6 options per scene
 - Backend validates during save
 - Generation services target these ranges
+- Min 1 option allows flexibility for simple binary choices
 
 ### Fallback Behavior
 
@@ -549,6 +550,98 @@ Watch for these in server logs during generation:
 }
 ```
 
+### Action Processing Modes
+
+The endpoint supports three processing modes with different performance characteristics:
+
+#### 1. Direct Selection Mode (Fastest)
+
+**Trigger:** Frontend sends `[SELECT:avenueId]` prefix (option button clicks)
+
+**Request:**
+```json
+{
+  "sessionId": "session-id",
+  "userInput": "[SELECT:scene_01_ai_1] Step cautiously into the darkness",
+  "tone": "cinematic"
+}
+```
+
+**Behavior:**
+- Bypasses all text matching and LLM classification
+- Uses scene narrative directly (no LLM narration)
+- Instant transition (< 100ms)
+- `matchedBy: "direct_selection"` in response
+- Zero LLM tokens consumed
+
+**Response:**
+```json
+{
+  "resolution": {
+    "type": "avenue",
+    "matchedBy": "direct_selection",
+    "selectedAvenueId": "scene_01_ai_1",
+    "confidence": 1,
+    "explanation": "Direct button selection.",
+    "narration": "You stand at the entrance of a mysterious cave...",
+    "llm": {
+      "provider": "deterministic",
+      "tokens": { "inputTokens": 0, "outputTokens": 0, "totalTokens": 0 }
+    }
+  }
+}
+```
+
+#### 2. Exact Match Mode (Fast)
+
+**Trigger:** User types text matching an option label exactly
+
+**Request:**
+```json
+{
+  "sessionId": "session-id",
+  "userInput": "Step cautiously into the darkness",
+  "tone": "cinematic"
+}
+```
+
+**Behavior:**
+- Direct text match (case-sensitive) or normalized match (case-insensitive)
+- Skips LLM classification
+- Skips LLM narration (uses scene narrative)
+- `matchedBy: "direct"` or `"normalized"` in response
+- Zero LLM tokens consumed
+
+#### 3. Freeform Mode (Slower)
+
+**Trigger:** User types custom input not matching any option
+
+**Behavior:**
+- LLM classifies intent against authored options
+- LLM generates contextual narration
+- `matchedBy: "llm"` in response
+- Consumes LLM tokens (~200-500 total)
+- Typical latency: 3-8 seconds depending on model
+
+**Response:**
+```json
+{
+  "resolution": {
+    "type": "avenue",
+    "matchedBy": "llm",
+    "selectedAvenueId": "enter_cave",
+    "confidence": 0.85,
+    "explanation": "The player wants to explore cautiously.",
+    "narration": "You take a careful step into the unknown darkness...",
+    "llm": {
+      "provider": "lmstudio",
+      "tokens": { "inputTokens": 315, "outputTokens": 180, "totalTokens": 495 }
+    }
+  }
+}
+```
+```
+
 ---
 
 ## LLM Integration
@@ -609,9 +702,23 @@ OPENROUTER_SITE_NAME=LuminaQuest
 ### LLM Processing Pipeline
 
 ```
-Player Input → classifyRoute() → generateNarration() → Response
-                 (intent)           (flavor text)
+Player Input
+    ↓
+[Direct Selection?] → YES → Use scene narrative → Response (0 tokens, <100ms)
+    ↓ NO
+[Exact Match?] → YES → Skip classification, use scene narrative → Response (0 tokens, <100ms)
+    ↓ NO
+classifyRoute() → generateNarration() → Response (~200-500 tokens, 3-8s)
+    (intent)           (flavor text)
 ```
+
+**Performance Characteristics:**
+
+| Mode | LLM Calls | Tokens | Latency |
+| ---- | --------- | ------ | ------- |
+| Direct Selection | 0 | 0 | <100ms |
+| Exact Match | 0 | 0 | <100ms |
+| Freeform | 2 | ~200-500 | 3-8s |
 
 #### Stage 1: Intent Classification
 
@@ -694,6 +801,23 @@ Player Input → classifyRoute() → generateNarration() → Response
 
 The server logs all LLM operations with emoji markers:
 
+**Direct Selection Mode (Option Button Click):**
+```
+[INPUT_MATCH] direct_selection sceneId=entrance, avenueId=enter_cave
+[GAME_ENGINE] ➡️  Resolution matchedBy=direct_selection, destinationSceneId=chamber, pointsDelta=1
+[GAME_ENGINE] ⚡ Skipping LLM narration for direct match
+[GAME_ENGINE] 💾 Session saved | Status: active | Points: 1
+```
+
+**Exact Match Mode (Typed Option Text):**
+```
+[INPUT_MATCH] direct sceneId=entrance, avenueId=enter_cave
+[GAME_ENGINE] ➡️  Resolution matchedBy=direct, destinationSceneId=chamber, pointsDelta=1
+[GAME_ENGINE] ⚡ Skipping LLM narration for direct match
+[GAME_ENGINE] 💾 Session saved | Status: active | Points: 1
+```
+
+**Freeform Mode (LLM Classification):**
 ```
 [GAME_ENGINE] 🎮 Processing action...
 [GAME_ENGINE] 👤 User Input: "I want to explore"
@@ -709,7 +833,7 @@ The server logs all LLM operations with emoji markers:
 [LLM_CLASSIFY] 📊 Result: routeType=avenue, avenueId=enter_cave, confidence=0.95
 [LLM_CLASSIFY] ⏱️  Latency: 8500.5ms | Tokens: 495
 
-[GAME_ENGINE] ➡️  Resolution: avenue -> chamber (+1 points)
+[GAME_ENGINE] ➡️  Resolution matchedBy=llm, destinationSceneId=chamber, pointsDelta=1
 
 [LLM_NARRATE] ✍️  Generating narration...
 [LLM_NARRATE] 📝 Resolution: avenue | Route: Enter cave | Tone: cinematic
