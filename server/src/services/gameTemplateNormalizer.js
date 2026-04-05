@@ -1,3 +1,5 @@
+import { logger } from '../utils/logger.js';
+
 function toPlain(game) {
   if (!game) return null;
   if (typeof game.toObject === 'function') {
@@ -100,7 +102,7 @@ export function normalizeGameTemplate(game) {
     scenes
   };
 
-  console.log('[TEMPLATE_V2] normalize', {
+  logger.info('[TEMPLATE_V2] normalize', {
     title: normalized.title,
     schemaVersion: normalized.schemaVersion,
     sceneCount: normalized.scenes.length,

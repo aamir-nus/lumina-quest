@@ -2,6 +2,7 @@ import { buildGameFlowPrompt } from './promptBuilders/gameFlowPromptBuilder.js';
 import { buildFlowTemplate, createDebugEntry } from './gameGenerationSupport.js';
 import { createLmStudioClient, getLmStudioModel, parseJsonResponse, withLlmTimeout } from './lmStudioService.js';
 import { validateGameTemplate } from './gameTemplateValidator.js';
+import { logger } from '../utils/logger.js';
 
 const MAX_ATTEMPTS = 3;
 
@@ -86,7 +87,7 @@ export async function generateGameFlow(input) {
   const model = getLmStudioModel();
   const debug = [];
 
-  console.log('[FLOW_GEN] start', {
+  logger.info('[FLOW_GEN] start', {
     title: input.title,
     difficulty: input.difficulty,
     tone: input.tone
@@ -95,7 +96,7 @@ export async function generateGameFlow(input) {
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     try {
       const prompt = buildGameFlowPrompt(input);
-      console.log('[FLOW_GEN] attempt', { attempt, model });
+      logger.info('[FLOW_GEN] attempt', { attempt, model });
 
       const response = await withLlmTimeout(
         client.responses.create({
@@ -136,7 +137,7 @@ export async function generateGameFlow(input) {
         : `Validation failed: ${validation.errors.join('; ')}`;
       debug.push(createDebugEntry({ phase: 'flow_generation', attempt, ok: validation.ok, summary, model }));
 
-      console.log('[FLOW_GEN] validation', {
+      logger.info('[FLOW_GEN] validation', {
         attempt,
         ok: validation.ok,
         errors: validation.errors,
@@ -150,12 +151,12 @@ export async function generateGameFlow(input) {
     } catch (error) {
       const summary = `${error.message || 'Unknown flow generation error'}`;
       debug.push(createDebugEntry({ phase: 'flow_generation', attempt, ok: false, summary, model }));
-      console.log('[FLOW_GEN] error', { attempt, summary });
+      logger.error('[FLOW_GEN] error', { attempt, summary });
     }
   }
 
   const fallback = buildManualFallback(input, debug, 'Flow generation failed after 3 attempts');
-  console.log('[FLOW_GEN] fallback', {
+  logger.info('[FLOW_GEN] fallback', {
     title: input.title,
     debugCount: debug.length
   });

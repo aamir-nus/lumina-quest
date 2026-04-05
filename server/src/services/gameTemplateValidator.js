@@ -1,5 +1,6 @@
 import { normalizeGameTemplate } from './gameTemplateNormalizer.js';
 import { getExpectedOptionRange } from './optionCountGenerator.js';
+import { logger } from '../utils/logger.js';
 
 function expectedOptionRange(difficulty = 'easy') {
   const range = getExpectedOptionRange(difficulty);
@@ -28,9 +29,9 @@ function reachableFromStart(game) {
 }
 
 function expectedOptionCount(difficulty = 'easy') {
-  if (difficulty === 'hard') return { min: 3, max: 5 };
-  if (difficulty === 'medium') return { min: 2, max: 4 };
-  return { min: 2, max: 3 };
+  if (difficulty === 'hard') return { min: 1, max: 6 };
+  if (difficulty === 'medium') return { min: 1, max: 5 };
+  return { min: 1, max: 3 };
 }
 
 function isTerminalEnding(scene) {
@@ -116,7 +117,7 @@ export function validateGameTemplate(input, { mode = 'draft' } = {}) {
     }
   }
 
-  console.log('[TEMPLATE_V2] validate', {
+  logger.info('[TEMPLATE_V2] validate', {
     title: game.title,
     mode,
     schemaVersion: game.schemaVersion,

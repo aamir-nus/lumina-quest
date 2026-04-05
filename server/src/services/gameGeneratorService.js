@@ -49,9 +49,7 @@ function parseOutput(response, fallback = {}) {
  * Generate a complete game template from a story description using LLM.
  */
 export async function generateGameFromStory({ title, description, story }) {
-  console.log('[GAME_GENERATOR] 🎮 Starting game generation...');
-  console.log(`[GAME_GENERATOR] 📖 Title: "${title}"`);
-  console.log(`[GAME_GENERATOR] 📝 Story: "${story.substring(0, 100)}..."`);
+  logger.info('[GAME_GENERATOR] 🎮 Starting game generation...', { title, story: story.substring(0, 100) });
 
   const client = createClient();
   const prompt = [
@@ -111,7 +109,7 @@ export async function generateGameFromStory({ title, description, story }) {
   ].join('\n');
 
   try {
-    console.log('[GAME_GENERATOR] 🔄 Calling LLM provider...');
+    logger.info('[GAME_GENERATOR] 🔄 Calling LLM provider...');
     const response = await client.responses.create({
       model: env.llmProvider === 'lmstudio' ? env.lmStudioModel : env.openRouterModel,
       input: [
@@ -131,7 +129,7 @@ export async function generateGameFromStory({ title, description, story }) {
       ]
     });
 
-    console.log('[GAME_GENERATOR] ✅ Got LLM response, parsing...');
+    logger.info('[GAME_GENERATOR] ✅ Got LLM response, parsing...');
     const parsed = parseOutput(response);
 
     if (!parsed.scenes || !Array.isArray(parsed.scenes) || parsed.scenes.length === 0) {
@@ -140,14 +138,14 @@ export async function generateGameFromStory({ title, description, story }) {
 
     // Validate constraints
     if (parsed.scenes.length > MAX_SCENES) {
-      console.warn(`[GAME_GENERATOR] ⚠️  LLM returned ${parsed.scenes.length} scenes, truncating to ${MAX_SCENES}`);
+      logger.warn('[GAME_GENERATOR] ⚠️  LLM returned too many scenes, truncating', { sceneCount: parsed.scenes.length, maxScenes: MAX_SCENES });
       parsed.scenes = parsed.scenes.slice(0, MAX_SCENES);
     }
 
     // Validate each scene's avenues
     for (const scene of parsed.scenes) {
       if (!scene.isTerminal && scene.avenues && scene.avenues.length > MAX_AVENUES_PER_SCENE) {
-        console.warn(`[GAME_GENERATOR] ⚠️  Scene ${scene.sceneId} has ${scene.avenues.length} avenues, truncating to ${MAX_AVENUES_PER_SCENE}`);
+        logger.warn('[GAME_GENERATOR] ⚠️  Scene has too many avenues, truncating', { sceneId: scene.sceneId, avenueCount: scene.avenues.length, maxAvenues: MAX_AVENUES_PER_SCENE });
         scene.avenues = scene.avenues.slice(0, MAX_AVENUES_PER_SCENE);
       }
     }
@@ -192,13 +190,11 @@ export async function generateGameFromStory({ title, description, story }) {
       }))
     };
 
-    console.log(`[GAME_GENERATOR] ✅ Generated game with ${gameTemplate.scenes.length} scenes`);
-    console.log(`[GAME_GENERATOR] 📊 Start: ${gameTemplate.startSceneId} | Terminal: ${gameTemplate.scenes.filter(s => s.isTerminal).length}`);
+    logger.info('[GAME_GENERATOR] ✅ Generated game', { sceneCount: gameTemplate.scenes.length, startSceneId: gameTemplate.startSceneId, terminalCount: gameTemplate.scenes.filter(s => s.isTerminal).length });
 
     return { success: true, game: gameTemplate };
   } catch (error) {
-    console.error(`[GAME_GENERATOR] ❌ Generation failed: ${error.message}`);
-    logger.error('Game generation failed', { message: error.message, stack: error.stack });
+    logger.error('[GAME_GENERATOR] ❌ Generation failed', { message: error.message, stack: error.stack });
     return {
       success: false,
       error: error.message || 'Failed to generate game. Please check your LLM provider configuration.'

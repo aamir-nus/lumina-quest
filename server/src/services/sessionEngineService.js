@@ -12,6 +12,7 @@ import {
   getInvalidAttemptState,
   resetInvalidAttempts
 } from './sessionFailurePolicy.js';
+import { logger } from '../utils/logger.js';
 
 function baseVisualStateFromScene(scene) {
   const render = scene?.renderConfig || {};
@@ -178,8 +179,7 @@ async function resolveClarification({ session, game, currentScene, payload, clas
 
 /* process one player action and persist deterministic game state changes. */
 export async function processSessionAction({ userId, payload }) {
-  console.log('\n[GAME_ENGINE] 🎮 Processing action...');
-  console.log(`[GAME_ENGINE] 👤 User Input: "${payload.userInput}"`);
+  logger.info('[GAME_ENGINE] 🎮 Processing action...', { userInput: payload.userInput });
 
   const session = await PlayerSession.findOne({ _id: payload.sessionId, userId });
   if (!session) throw new ApiError(404, 'SESSION_NOT_FOUND', 'Session not found');
@@ -191,7 +191,7 @@ export async function processSessionAction({ userId, payload }) {
   if (!gameDoc) throw new ApiError(404, 'GAME_NOT_FOUND', 'Game for session no longer exists');
   const game = normalizeGameTemplate(gameDoc);
 
-  console.log(`[GAME_ENGINE] 🎲 Game: ${game.title} | Turn: ${session.stats.turnsUsed + 1}`);
+  logger.info('[GAME_ENGINE] 🎲 Game state', { gameTitle: game.title, turn: session.stats.turnsUsed + 1 });
 
   const currentScene = game.scenes.find((scene) => scene.sceneId === session.currentSceneId);
   const traceId = startTrace('session_action', {
@@ -200,7 +200,7 @@ export async function processSessionAction({ userId, payload }) {
   });
 
   if (!currentScene || currentScene.isTerminal || currentScene.avenues.length === 0) {
-    console.log('[GAME_ENGINE] 🏁 Terminal state reached');
+    logger.info('[GAME_ENGINE] 🏁 Terminal state reached');
     resolveTerminal(session, game, traceId);
     await saveSessionOrThrowConflict(session);
     return {
@@ -216,7 +216,7 @@ export async function processSessionAction({ userId, payload }) {
     };
   }
 
-  console.log(`[GAME_ENGINE] 📍 Current Scene: ${currentScene.sceneId}`);
+  logger.info('[GAME_ENGINE] 📍 Current Scene', { sceneId: currentScene.sceneId });
 
   const classified = await resolveSceneInput({
     game,
@@ -274,7 +274,7 @@ export async function processSessionAction({ userId, payload }) {
   }
 
   if (classified.routeType === 'clarification') {
-    console.log('[GAME_ENGINE] ❓ Classification requested clarification');
+    logger.info('[GAME_ENGINE] ❓ Classification requested clarification');
     return resolveClarification({ session, game, currentScene, payload, classified, traceId });
   }
 
@@ -327,7 +327,7 @@ export async function processSessionAction({ userId, payload }) {
   session.stats.turnsUsed += 1;
   session.currentSceneId = destinationSceneId;
 
-  console.log(`[GAME_ENGINE] ➡️  Resolution: ${resolutionType} -> ${destinationSceneId} (+${pointsDelta} points)`);
+  logger.info('[GAME_ENGINE] ➡️  Resolution', { resolutionType, destinationSceneId, pointsDelta, matchedBy: classified.matchedBy });
 
   const nextScene = game.scenes.find((scene) => scene.sceneId === destinationSceneId);
   const nextVisualBase = baseVisualStateFromScene(nextScene || currentScene);
@@ -337,7 +337,7 @@ export async function processSessionAction({ userId, payload }) {
   }
   if (nextScene?.isTerminal || session.stats.turnsUsed >= game.constraints.maxTurns) {
     session.status = session.stats.points >= game.constraints.targetPoints ? 'won' : 'lost';
-    console.log(`[GAME_ENGINE] 🏁 Game ${session.status.toUpperCase()}! Points: ${session.stats.points}/${game.constraints.targetPoints}`);
+    logger.info('[GAME_ENGINE] 🏁 Game finished', { status: session.status.toUpperCase(), points: session.stats.points, targetPoints: game.constraints.targetPoints });
   }
 
   session.history.push({
@@ -353,19 +353,31 @@ export async function processSessionAction({ userId, payload }) {
     pointsDelta
   });
 
-  const narration = await generateNarration({
-    gameTitle: game.title,
-    sceneNarrative: nextScene?.narrative || currentScene.narrative,
-    playerInput: payload.userInput,
-    resolutionType,
-    routeLabel: selectedAvenue?.label || wildcardMode || '',
-    tone: payload.tone
-  });
+  // Skip LLM narration for direct/normalized/deterministic matches - use simple transition
+  const isDirectMatch = classified.matchedBy === 'direct_selection' || classified.matchedBy === 'direct' || classified.matchedBy === 'normalized';
+  let narration;
+  if (isDirectMatch) {
+    logger.info('[GAME_ENGINE] ⚡ Skipping LLM narration for direct match', { matchedBy: classified.matchedBy });
+    narration = {
+      text: nextScene?.narrative || currentScene.narrative,
+      provider: 'deterministic',
+      usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 }
+    };
+  } else {
+    narration = await generateNarration({
+      gameTitle: game.title,
+      sceneNarrative: nextScene?.narrative || currentScene.narrative,
+      playerInput: payload.userInput,
+      resolutionType,
+      routeLabel: selectedAvenue?.label || wildcardMode || '',
+      tone: payload.tone
+    });
+  }
 
   session.history[session.history.length - 1].narration = narration.text;
   await saveSessionOrThrowConflict(session);
 
-  console.log(`[GAME_ENGINE] 💾 Session saved | Status: ${session.status} | Points: ${session.stats.points}`);
+  logger.info('[GAME_ENGINE] 💾 Session saved', { status: session.status, points: session.stats.points });
 
   addSpan(traceId, 'state_update', {
     resolutionType,

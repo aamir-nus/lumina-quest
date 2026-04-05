@@ -4,6 +4,7 @@ import { normalizeGameTemplate } from './gameTemplateNormalizer.js';
 import { validateGameTemplate } from './gameTemplateValidator.js';
 import { createLmStudioClient, getLmStudioModel, parseJsonResponse, withLlmTimeout } from './lmStudioService.js';
 import { generateOptionCounts } from './optionCountGenerator.js';
+import { logger } from '../utils/logger.js';
 
 const MAX_ATTEMPTS = 3;
 
@@ -88,7 +89,7 @@ async function generateOptionsForScene({ client, model, game, scene }) {
   const failScene = findDefaultFailScene(game);
   const allowedSceneIds = new Set([nextScene?.sceneId, failScene?.sceneId].filter(Boolean));
 
-  console.log('[OPTION_GEN] generated counts', {
+  logger.info('[OPTION_GEN] generated counts', {
     sceneId: scene.sceneId,
     difficulty,
     ...optionCounts
@@ -107,7 +108,7 @@ async function generateOptionsForScene({ client, model, game, scene }) {
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     try {
-      console.log('[OPTION_GEN] attempt', { sceneId: scene.sceneId, attempt, model });
+      logger.info('[OPTION_GEN] attempt', { sceneId: scene.sceneId, attempt, model });
       const response = await withLlmTimeout(
         client.responses.create({
           model,
@@ -152,7 +153,7 @@ async function generateOptionsForScene({ client, model, game, scene }) {
         };
       }
     } catch (error) {
-      console.log('[OPTION_GEN] error', {
+      logger.error('[OPTION_GEN] error', {
         sceneId: scene.sceneId,
         attempt,
         summary: error.message
@@ -202,7 +203,7 @@ export async function generateGameOptions(inputGame, requestedSceneIds = []) {
     : new Set(game.scenes.filter((scene) => scene.kind !== 'ending').map((scene) => scene.sceneId));
   const debug = [...(game.generationState?.debug || [])];
 
-  console.log('[OPTION_GEN] start', {
+  logger.info('[OPTION_GEN] start', {
     title: game.title,
     targetCount: targets.size,
     difficulty: game.storyConfig?.difficulty
@@ -243,7 +244,7 @@ export async function generateGameOptions(inputGame, requestedSceneIds = []) {
     pendingSceneIds.length === 0 ? '' : 'One or more scenes require manual option authoring'
   );
 
-  console.log('[OPTION_GEN] finish', {
+  logger.info('[OPTION_GEN] finish', {
     title: game.title,
     status,
     pendingSceneIds: game.generationState.pendingSceneIds

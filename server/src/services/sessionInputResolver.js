@@ -1,4 +1,5 @@
 import { classifyRoute } from './llmResolver.js';
+import { logger } from '../utils/logger.js';
 
 export function stripInputText(value) {
   return String(value || '').trim();
@@ -40,10 +41,34 @@ export async function resolveSceneInput({
 }) {
   const avenues = currentScene.avenues || [];
 
+  // Direct selection via frontend button click (bypasses all matching/LLM)
+  const directSelectionMatch = userInput.match(/^\[SELECT:([^\]]+)\]\s*/);
+  if (directSelectionMatch) {
+    const avenueId = directSelectionMatch[1];
+    const avenue = avenues.find((a) => a.avenueId === avenueId);
+    if (avenue) {
+      logger.info('[INPUT_MATCH] direct_selection', {
+        sceneId: currentScene.sceneId,
+        avenueId
+      });
+      return {
+        routeType: 'avenue',
+        matchedBy: 'direct_selection',
+        avenueId: avenue.avenueId,
+        confidence: 1,
+        explanation: 'Direct button selection.',
+        provider: 'deterministic',
+        usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+        computeApprox: null,
+        providerResponse: null
+      };
+    }
+  }
+
   // First optimization: direct stripped match (fastest)
   const directMatch = findDirectAvenueMatch(userInput, avenues);
   if (directMatch) {
-    console.log('[INPUT_MATCH] direct', {
+    logger.info('[INPUT_MATCH] direct', {
       sceneId: currentScene.sceneId,
       avenueId: directMatch.avenueId
     });
@@ -63,7 +88,7 @@ export async function resolveSceneInput({
   // Second optimization: normalized match (case-insensitive)
   const exactMatch = findExactAvenueMatch(userInput, avenues);
   if (exactMatch) {
-    console.log('[INPUT_MATCH] normalized', {
+    logger.info('[INPUT_MATCH] normalized', {
       sceneId: currentScene.sceneId,
       avenueId: exactMatch.avenueId
     });
@@ -74,7 +99,7 @@ export async function resolveSceneInput({
       confidence: 1,
       explanation: 'Normalized option text matched an authored route.',
       provider: 'deterministic',
-      usage: { inputTokens: 0, outputTokens: 0, outputTokens: 0, totalTokens: 0 },
+      usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
       computeApprox: null,
       providerResponse: null
     };
