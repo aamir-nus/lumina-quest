@@ -2,6 +2,8 @@
 
 Turn-based MERN story engine where authored branches stay deterministic and LLMs map free-form player intent to valid avenues.
 
+![1776057314103](image/README/1776057314103.png)
+
 ## Architecture
 
 ```mermaid
