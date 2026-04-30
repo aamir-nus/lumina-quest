@@ -49,6 +49,31 @@ Access the application at **http://localhost:8080**
 - Username: `admin`
 - Password: `admin`
 
+**Important: Rebuilding After Code Changes**
+
+Docker builds images from source during `docker compose up`. If you make changes to the code:
+
+```bash
+# Rebuild and restart specific service
+docker compose up -d --build web
+
+# Rebuild both web and server
+docker compose up -d --build
+
+# Force rebuild without cache (if changes aren't appearing)
+docker compose build --no-cache web server
+docker compose up -d
+```
+
+**First-Time Setup: Onboarding Wizard**
+
+On first visit, you'll see an onboarding wizard to configure your LLM provider:
+
+- **Local LLM (Recommended)**: Use LM Studio or similar running locally. Free, fast, private.
+- **OpenRouter (Cloud)**: Use cloud-based AI models. Requires API key, costs money per use.
+
+The onboarding settings are stored in your browser session. You can re-run onboarding by clearing the `luminaquest_onboarding_completed` key in localStorage.
+
 ### Option 2: Development Mode
 
 ```bash
@@ -67,7 +92,7 @@ npm run dev:server
 npm run dev:web
 ```
 
-Access the application at **http://localhost:5173`
+Access the application at **http://localhost:5173**
 
 ## Configuration
 
@@ -91,30 +116,43 @@ CORS_ALLOW_NO_ORIGIN=false
 
 ### LLM Provider Configuration
 
+LuminaQuest supports two LLM providers for game authoring and free-form input resolution:
+
+#### LMStudio (Local Inference - Recommended)
+
+Free, fast, and private. Runs entirely on your machine.
+
 ```bash
-# LMStudio (Local Inference - Recommended for dev)
 LLM_PROVIDER=lmstudio
 LMSTUDIO_BASE_URL=http://127.0.0.1:1234/v1
 LMSTUDIO_API_KEY=lm-studio
 LMSTUDIO_MODEL=google/gemma-3-4b
 ```
 
+**For Docker Compose**, use `host.docker.internal` to access your local LLM from within containers:
+
 ```bash
-# OpenRouter (External API - Good for production)
+# .env file for docker compose
+LLM_PROVIDER=lmstudio
+LMSTUDIO_BASE_URL=http://host.docker.internal:1234/v1
+LMSTUDIO_MODEL=google/gemma-3-4b
+```
+
+#### OpenRouter (External API - Cloud-based)
+
+Paid service. Good for production when you can't run local inference.
+
+```bash
 LLM_PROVIDER=openrouter
 OPENROUTER_API_KEY=sk-or-v1-xxxxx
 OPENROUTER_MODEL=openrouter/free
 ```
 
-For Docker Compose, create a `.env` file in the project root:
+#### Onboarding Wizard Configuration
 
-```bash
-# .env file for docker compose
-JWT_SECRET=your-production-secret-key-min-24-chars
-LLM_PROVIDER=lmstudio
-LMSTUDIO_BASE_URL=http://host.docker.internal:1234/v1
-LMSTUDIO_MODEL=google/gemma-3-4b
-```
+Instead of manually configuring environment variables, you can use the built-in onboarding wizard on first launch. The wizard validates your LLM connection and stores the configuration in your browser session.
+
+**Note**: Onboarding-configured providers are session-only and won't persist across browser restarts. For persistent configuration, use environment variables.
 
 ## Auth + API Notes
 
