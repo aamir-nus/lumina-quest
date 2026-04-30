@@ -166,7 +166,7 @@ main:not(.login-screen):not(.onboarding-screen) {
 
 .auth-container {
   width: 100%;
-  max-width: 400px;
+  max-width: 500px;
   display: flex;
   justify-content: center;
 }
