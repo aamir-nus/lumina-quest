@@ -28,14 +28,16 @@ services:
       - NODE_ENV=production
       - MONGO_URI=mongodb://mongo:27017/luminaquest
       - JWT_SECRET=${JWT_SECRET:-luminaquest-jwt-secret-min-24-chars-required-for-production-use}
-      - CLIENT_ORIGIN=http://localhost:8080
+      - CLIENT_ORIGIN=${CLIENT_ORIGIN:-http://localhost:5173,http://localhost:8080}
       - CORS_ALLOW_NO_ORIGIN=false
+      - COOKIE_SECURE=${COOKIE_SECURE:-false}
       - LLM_PROVIDER=${LLM_PROVIDER:-lmstudio}
       - LMSTUDIO_BASE_URL=${LMSTUDIO_BASE_URL:-http://host.docker.internal:1234/v1}
       - LMSTUDIO_API_KEY=${LMSTUDIO_API_KEY:-lm-studio}
       - LMSTUDIO_MODEL=${LMSTUDIO_MODEL:-google/gemma-3-4b}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - OPENROUTER_MODEL=${OPENROUTER_MODEL:-openrouter/free}
+      - OPENROUTER_SITE_URL=${OPENROUTER_SITE_URL:-http://localhost:8080}
       # Run smoke tests on startup (set to 'true' to enable)
       - RUN_SMOKE_TESTS=${RUN_SMOKE_TESTS:-false}
     depends_on:

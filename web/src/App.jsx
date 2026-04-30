@@ -3,7 +3,7 @@ import { api } from './api';
 import { AuthPanel } from './components/AuthPanel';
 import { AdminPanel } from './components/AdminPanel';
 import { PlayerPanel } from './components/PlayerPanel';
-import { OnboardingWizard, isOnboardingCompleted, clearOnboardingState, shouldShowAdminOnboarding, markAdminOnboardingShown } from './components/OnboardingWizard';
+import { OnboardingWizard, isOnboardingCompleted, clearAdminOnboardingShown, clearOnboardingState, getStoredLlmSettings, shouldShowAdminOnboarding, markAdminOnboardingShown } from './components/OnboardingWizard';
 
 // Developer helper: allow re-running onboarding from browser console
 if (typeof window !== 'undefined') {
@@ -27,6 +27,7 @@ export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(!isOnboardingCompleted());
   const [adminOnboardingPending, setAdminOnboardingPending] = useState(shouldShowAdminOnboarding());
   const [showSettings, setShowSettings] = useState(false);
+  const llmSettings = getStoredLlmSettings();
 
   const me = useMemo(() => auth?.user || null, [auth]);
 
@@ -72,12 +73,7 @@ export default function App() {
     api.post('/auth/logout').catch(() => {});
     setAuth(null);
     setAdminTab('player-forge');
-    // Reset admin onboarding session flag on logout
-    try {
-      sessionStorage.removeItem('luminaquest_onboarding_shown_this_session');
-    } catch {
-      // Ignore
-    }
+    clearAdminOnboardingShown();
     setAdminOnboardingPending(true);
   };
 
@@ -146,9 +142,9 @@ export default function App() {
 
             <div className="settings-info">
               <h3>Current Configuration</h3>
-              <p><strong>Provider:</strong> {localStorage.getItem('luminaquest_llm_provider') || 'lmstudio'}</p>
-              <p><strong>URL:</strong> {localStorage.getItem('luminaquest_llm_url') || 'http://127.0.0.1:1234/v1'}</p>
-              <p><strong>Model:</strong> {localStorage.getItem('luminaquest_llm_model') || 'google/gemma-3-4b'}</p>
+              <p><strong>Provider:</strong> {llmSettings.provider}</p>
+              <p><strong>URL:</strong> {llmSettings.lmStudioUrl}</p>
+              <p><strong>Model:</strong> {llmSettings.lmStudioModel}</p>
             </div>
 
             <div className="settings-actions">

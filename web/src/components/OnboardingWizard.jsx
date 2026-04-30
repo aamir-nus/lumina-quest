@@ -16,16 +16,50 @@ import { api } from '../api';
 
 const STORAGE_KEY = 'luminaquest_onboarding_completed';
 const SESSION_SHOWN_KEY = 'luminaquest_onboarding_shown_this_session';
+const STORAGE_COOKIE_KEY = 'luminaquest_onboarding_completed';
+const SESSION_COOKIE_KEY = 'luminaquest_onboarding_shown_this_session';
+const LLM_PROVIDER_KEY = 'luminaquest_llm_provider';
+const LLM_URL_KEY = 'luminaquest_llm_url';
+const LLM_MODEL_KEY = 'luminaquest_llm_model';
+const LLM_CONFIG_SESSION_KEY = 'luminaquest_llm_config';
+
+function readCookie(name) {
+  if (typeof document === 'undefined') return '';
+  const prefix = `${name}=`;
+  const entry = document.cookie.split('; ').find((cookie) => cookie.startsWith(prefix));
+  if (!entry) return '';
+  return decodeURIComponent(entry.slice(prefix.length));
+}
+
+function writeCookie(name, value, options = {}) {
+  if (typeof document === 'undefined') return;
+  const parts = [`${name}=${encodeURIComponent(value)}`, 'Path=/', 'SameSite=Lax'];
+  if (options.maxAge != null) {
+    parts.push(`Max-Age=${options.maxAge}`);
+  }
+  document.cookie = parts.join('; ');
+}
+
+function removeCookie(name) {
+  writeCookie(name, '', { maxAge: 0 });
+}
 
 export function isOnboardingCompleted() {
+  const cookieValue = readCookie(STORAGE_COOKIE_KEY);
+  if (cookieValue) return cookieValue === 'true';
   try {
-    return localStorage.getItem(STORAGE_KEY) === 'true';
+    const storedValue = localStorage.getItem(STORAGE_KEY) === 'true';
+    if (storedValue) {
+      writeCookie(STORAGE_COOKIE_KEY, 'true', { maxAge: 60 * 60 * 24 * 365 });
+    }
+    return storedValue;
   } catch {
     return false;
   }
 }
 
 export function setOnboardingCompleted() {
+  writeCookie(STORAGE_COOKIE_KEY, 'true', { maxAge: 60 * 60 * 24 * 365 });
   try {
     localStorage.setItem(STORAGE_KEY, 'true');
   } catch (error) {
@@ -34,6 +68,7 @@ export function setOnboardingCompleted() {
 }
 
 export function clearOnboardingState() {
+  removeCookie(STORAGE_COOKIE_KEY);
   try {
     localStorage.removeItem(STORAGE_KEY);
   } catch (error) {
@@ -42,19 +77,85 @@ export function clearOnboardingState() {
 }
 
 export function shouldShowAdminOnboarding() {
+  const cookieValue = readCookie(SESSION_COOKIE_KEY);
+  if (cookieValue) return cookieValue !== 'true';
   try {
     // Check if we've already shown onboarding this session
-    return sessionStorage.getItem(SESSION_SHOWN_KEY) !== 'true';
+    const alreadyShown = sessionStorage.getItem(SESSION_SHOWN_KEY) === 'true';
+    if (alreadyShown) {
+      writeCookie(SESSION_COOKIE_KEY, 'true');
+    }
+    return !alreadyShown;
   } catch {
     return true;
   }
 }
 
 export function markAdminOnboardingShown() {
+  writeCookie(SESSION_COOKIE_KEY, 'true');
   try {
     sessionStorage.setItem(SESSION_SHOWN_KEY, 'true');
   } catch (error) {
     console.warn('Failed to mark admin onboarding as shown:', error);
+  }
+}
+
+export function clearAdminOnboardingShown() {
+  removeCookie(SESSION_COOKIE_KEY);
+  try {
+    sessionStorage.removeItem(SESSION_SHOWN_KEY);
+  } catch (error) {
+    console.warn('Failed to clear admin onboarding state:', error);
+  }
+}
+
+export function getStoredLlmSettings() {
+  const provider = readCookie(LLM_PROVIDER_KEY);
+  const lmStudioUrl = readCookie(LLM_URL_KEY);
+  const lmStudioModel = readCookie(LLM_MODEL_KEY);
+
+  if (provider || lmStudioUrl || lmStudioModel) {
+    return {
+      provider: provider || 'lmstudio',
+      lmStudioUrl: lmStudioUrl || 'http://127.0.0.1:1234/v1',
+      lmStudioModel: lmStudioModel || 'google/gemma-3-4b'
+    };
+  }
+
+  try {
+    const storedSettings = {
+      provider: localStorage.getItem(LLM_PROVIDER_KEY) || 'lmstudio',
+      lmStudioUrl: localStorage.getItem(LLM_URL_KEY) || 'http://127.0.0.1:1234/v1',
+      lmStudioModel: localStorage.getItem(LLM_MODEL_KEY) || 'google/gemma-3-4b'
+    };
+    if (
+      localStorage.getItem(LLM_PROVIDER_KEY)
+      || localStorage.getItem(LLM_URL_KEY)
+      || localStorage.getItem(LLM_MODEL_KEY)
+    ) {
+      setStoredLlmSettings(storedSettings);
+    }
+    return storedSettings;
+  } catch {
+    return {
+      provider: 'lmstudio',
+      lmStudioUrl: 'http://127.0.0.1:1234/v1',
+      lmStudioModel: 'google/gemma-3-4b'
+    };
+  }
+}
+
+export function setStoredLlmSettings(config) {
+  writeCookie(LLM_PROVIDER_KEY, config.provider, { maxAge: 60 * 60 * 24 * 365 });
+  writeCookie(LLM_URL_KEY, config.lmStudioUrl, { maxAge: 60 * 60 * 24 * 365 });
+  writeCookie(LLM_MODEL_KEY, config.lmStudioModel, { maxAge: 60 * 60 * 24 * 365 });
+  try {
+    localStorage.setItem(LLM_PROVIDER_KEY, config.provider);
+    localStorage.setItem(LLM_URL_KEY, config.lmStudioUrl);
+    localStorage.setItem(LLM_MODEL_KEY, config.lmStudioModel);
+    sessionStorage.setItem(LLM_CONFIG_SESSION_KEY, JSON.stringify(config));
+  } catch (error) {
+    console.warn('Failed to save LLM config:', error);
   }
 }
 
@@ -137,24 +238,12 @@ export function OnboardingWizard({ onComplete }) {
 
   const handleComplete = () => {
     setOnboardingCompleted();
-    // Store config in localStorage for settings display and sessionStorage for current session
-    try {
-      const config = {
-        provider,
-        lmStudioUrl: provider === 'lmstudio' ? lmStudioUrl : '',
-        lmStudioModel: provider === 'lmstudio' ? lmStudioModel.trim() : ''
-      };
-
-      // Store in localStorage for settings display
-      localStorage.setItem('luminaquest_llm_provider', config.provider);
-      localStorage.setItem('luminaquest_llm_url', config.lmStudioUrl);
-      localStorage.setItem('luminaquest_llm_model', config.lmStudioModel);
-
-      // Store in sessionStorage for API usage (if we implement client-side API calls)
-      sessionStorage.setItem('luminaquest_llm_config', JSON.stringify(config));
-    } catch (error) {
-      console.warn('Failed to save LLM config:', error);
-    }
+    const config = {
+      provider,
+      lmStudioUrl: provider === 'lmstudio' ? lmStudioUrl : '',
+      lmStudioModel: provider === 'lmstudio' ? lmStudioModel.trim() : ''
+    };
+    setStoredLlmSettings(config);
     setStep('complete');
     // Call onComplete after delay
     console.log('[ONBOARDING] Scheduling onComplete callback in 1.5s');

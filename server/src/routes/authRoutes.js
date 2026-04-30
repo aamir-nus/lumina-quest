@@ -15,7 +15,7 @@ const DUMMY_PASSWORD_HASH = '$2b$10$0iqfFm8vA2xqf2bR.6M1x..xDORfNeiQk4SUfD2/eKTz
 function setAuthCookie(res, token) {
   res.cookie('auth_token', token, {
     httpOnly: true,
-    secure: env.nodeEnv === 'production',
+    secure: env.cookieSecure,
     sameSite: 'lax',
     maxAge: 7 * 24 * 60 * 60 * 1000
   });
