@@ -8,6 +8,38 @@ import { logger } from '../utils/logger.js';
 
 const MAX_ATTEMPTS = 3;
 
+/**
+ * Build historical context for option generation
+ * Includes all previous scenes (with their options), current scene, and next scene
+ *
+ * @param {Object} game - Game template
+ * @param {Object} currentScene - Scene we're generating options for
+ * @param {Set<string>} processedSceneIds - Scenes we've already generated options for
+ * @returns {Array<{scene: Object, options: Array}>} - Historical context
+ */
+function buildHistoricalContext(game, currentScene, processedSceneIds) {
+  const beats = game.scenes
+    .filter((item) => item.kind === 'beat')
+    .sort((a, b) => a.stepIndex - b.stepIndex);
+
+  const history = [];
+
+  // Add all previously processed scenes with their options
+  for (const beat of beats) {
+    if (processedSceneIds.has(beat.sceneId)) {
+      history.push({
+        scene: beat,
+        options: beat.avenues || []
+      });
+    } else if (beat.sceneId === currentScene.sceneId) {
+      // Stop at current scene (we'll add it separately)
+      break;
+    }
+  }
+
+  return history;
+}
+
 function findDefaultFailScene(game) {
   return game.scenes.find((scene) => scene.kind === 'ending' && scene.endingType === 'fail')
     || game.scenes.find((scene) => scene.kind === 'ending')
@@ -82,16 +114,20 @@ function updateGenerationState(game, pendingSceneIds, debug, status, lastError =
   };
 }
 
-async function generateOptionsForScene({ client, model, game, scene }) {
+async function generateOptionsForScene({ client, model, game, scene, processedSceneIds }) {
   const difficulty = game.storyConfig?.difficulty || 'easy';
   const optionCounts = generateOptionCounts(difficulty);
   const nextScene = findNextSuccessScene(game, scene);
   const failScene = findDefaultFailScene(game);
   const allowedSceneIds = new Set([nextScene?.sceneId, failScene?.sceneId].filter(Boolean));
 
-  logger.info('[OPTION_GEN] generated counts', {
+  // Build historical context for narrative consistency
+  const history = buildHistoricalContext(game, scene, processedSceneIds);
+
+  logger.info('[OPTION_GEN] generating with context', {
     sceneId: scene.sceneId,
     difficulty,
+    contextScenes: history.length,
     ...optionCounts
   });
 
@@ -103,7 +139,8 @@ async function generateOptionsForScene({ client, model, game, scene }) {
     currentScene: scene,
     nextScene,
     failScene,
-    optionCounts
+    optionCounts,
+    history // Pass historical context to prompt builder
   });
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
@@ -211,21 +248,32 @@ export async function generateGameOptions(inputGame, requestedSceneIds = []) {
 
   game = updateGenerationState(game, [...new Set([...existingPending, ...targets])], debug, 'generating_options');
 
+  // Track processed scenes in order for historical context
+  const processedSceneIds = new Set(
+    game.scenes
+      .filter((scene) => scene.kind !== 'ending' && (scene.avenues || []).length > 0)
+      .sort((a, b) => a.stepIndex - b.stepIndex)
+      .map((scene) => scene.sceneId)
+  );
+
   for (const scene of game.scenes) {
     if (scene.kind === 'ending' || !targets.has(scene.sceneId)) continue;
 
-    const result = await generateOptionsForScene({ client, model, game, scene });
+    const result = await generateOptionsForScene({ client, model, game, scene, processedSceneIds });
     debug.push(result.debug);
 
     if (result.success) {
       game = applySceneOptions(game, scene.sceneId, result.avenues);
       targets.delete(scene.sceneId);
       existingPending.delete(scene.sceneId);
+      // Mark this scene as processed for future context
+      processedSceneIds.add(scene.sceneId);
     } else {
       existingPending.add(scene.sceneId);
+      // Add friendly warning message for manual authoring
       game.authoringWarnings = [
         ...(game.authoringWarnings || []),
-        `Option generation failed for ${scene.sceneId}. Manual authoring required.`
+        `The magic has run out for "${scene.goalSummary || scene.sceneId}" - you'll have to forge ahead alone! Manual option authoring required.`
       ];
     }
   }
