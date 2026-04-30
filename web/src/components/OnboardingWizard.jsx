@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '../api';
 
@@ -70,6 +70,10 @@ export function forceShowOnboarding() {
 export function OnboardingWizard({ onComplete }) {
   const [step, setStep] = useState('welcome'); // 'welcome' | 'configure' | 'validate' | 'complete'
   const [provider, setProvider] = useState('lmstudio');
+
+  // Keep onComplete ref stable to avoid stale closure in useEffect
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
 
   // Fetch default config from server
   const { data: defaultConfig } = useQuery({
@@ -168,11 +172,10 @@ export function OnboardingWizard({ onComplete }) {
   useEffect(() => {
     if (step === 'complete') {
       const timer = setTimeout(() => {
-        onComplete();
+        onCompleteRef.current();
       }, 1500);
       return () => clearTimeout(timer);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
   return (
