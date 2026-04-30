@@ -71,10 +71,6 @@ export function OnboardingWizard({ onComplete }) {
   const [step, setStep] = useState('welcome'); // 'welcome' | 'configure' | 'validate' | 'complete'
   const [provider, setProvider] = useState('lmstudio');
 
-  // Keep onComplete ref stable to avoid stale closure in useEffect
-  const onCompleteRef = useRef(onComplete);
-  onCompleteRef.current = onComplete;
-
   // Fetch default config from server
   const { data: defaultConfig } = useQuery({
     queryKey: ['onboarding-default-config'],
@@ -160,6 +156,8 @@ export function OnboardingWizard({ onComplete }) {
       console.warn('Failed to save LLM config:', error);
     }
     setStep('complete');
+    // Call onComplete after delay
+    setTimeout(() => onComplete(), 1500);
   };
 
   const handleSkip = () => {
@@ -167,16 +165,6 @@ export function OnboardingWizard({ onComplete }) {
     setOnboardingCompleted();
     onComplete();
   };
-
-  // When entering complete step, wait 1.5s then finish
-  useEffect(() => {
-    if (step === 'complete') {
-      const timer = setTimeout(() => {
-        onCompleteRef.current();
-      }, 1500);
-      return () => clearTimeout(timer);
-    }
-  }, [step]);
 
   return (
     <main className="onboarding-screen">
