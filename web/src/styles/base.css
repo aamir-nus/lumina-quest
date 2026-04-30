@@ -284,6 +284,11 @@ code {
   margin-top: 4px;
 }
 
+.required {
+  color: #b42318;
+  margin-left: 2px;
+}
+
 .step-actions {
   display: flex;
   justify-content: center;

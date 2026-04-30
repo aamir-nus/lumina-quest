@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '../api';
 
 /**
@@ -70,8 +70,17 @@ export function forceShowOnboarding() {
 export function OnboardingWizard({ onComplete }) {
   const [step, setStep] = useState('welcome'); // 'welcome' | 'configure' | 'validate' | 'complete'
   const [provider, setProvider] = useState('lmstudio');
-  const [lmStudioUrl, setLmStudioUrl] = useState('http://127.0.0.1:1234/v1');
-  const [lmStudioModel, setLmStudioModel] = useState('');
+
+  // Fetch default config from server
+  const { data: defaultConfig } = useQuery({
+    queryKey: ['onboarding-default-config'],
+    queryFn: async () => (await api.get('/onboarding/default-config')).data,
+    retry: false
+  });
+
+  // Initialize with server defaults
+  const [lmStudioUrl, setLmStudioUrl] = useState(defaultConfig?.defaultLmStudioBaseUrl || 'http://127.0.0.1:1234/v1');
+  const [lmStudioModel, setLmStudioModel] = useState(defaultConfig?.defaultLmStudioModel || '');
   const [openRouterKey, setOpenRouterKey] = useState('');
   const [validationResult, setValidationResult] = useState(null);
 
@@ -94,10 +103,20 @@ export function OnboardingWizard({ onComplete }) {
   });
 
   const handleTestConnection = () => {
+    // Validate required fields before testing
+    if (provider === 'lmstudio' && !lmStudioModel?.trim()) {
+      setValidationResult({
+        ok: false,
+        message: 'Model name is required. Please enter the model name from LM Studio.'
+      });
+      setStep('validate');
+      return;
+    }
+
     const config = {
       llmProvider: provider,
       lmStudioBaseUrl: provider === 'lmstudio' ? lmStudioUrl : undefined,
-      lmStudioModel: provider === 'lmstudio' ? lmStudioModel || 'local-model' : undefined,
+      lmStudioModel: provider === 'lmstudio' ? lmStudioModel.trim() : undefined,
       openRouterApiKey: provider === 'openrouter' ? openRouterKey : undefined,
       openRouterModel: provider === 'openrouter' ? 'meta-llama/llama-3.2-3b-instruct:free' : undefined
     };
@@ -111,7 +130,7 @@ export function OnboardingWizard({ onComplete }) {
       const config = {
         provider,
         lmStudioUrl: provider === 'lmstudio' ? lmStudioUrl : '',
-        lmStudioModel: provider === 'lmstudio' ? lmStudioModel || 'local-model' : ''
+        lmStudioModel: provider === 'lmstudio' ? lmStudioModel.trim() : ''
       };
 
       // Store in localStorage for settings display
@@ -229,17 +248,18 @@ export function OnboardingWizard({ onComplete }) {
                   </div>
 
                   <div className="form-group">
-                    <label htmlFor="lmstudio-model">Model Name (Optional)</label>
+                    <label htmlFor="lmstudio-model">Model Name <span className="required">*</span></label>
                     <input
                       id="lmstudio-model"
                       type="text"
                       value={lmStudioModel}
                       onChange={(e) => setLmStudioModel(e.target.value)}
-                      placeholder="e.g., google/gemma-3-4b"
+                      placeholder={defaultConfig?.defaultLmStudioModel || 'e.g., google/gemma-3-4b'}
                       className="form-input"
+                      required
                     />
                     <p className="form-hint">
-                      Leave empty to use the currently loaded model in LM Studio
+                      The exact model name as shown in LM Studio (e.g., {defaultConfig?.defaultLmStudioModel || 'google/gemma-3-4b'})
                     </p>
                   </div>
                 </>
