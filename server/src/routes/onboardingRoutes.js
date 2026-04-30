@@ -41,7 +41,11 @@ router.post('/validate-llm', asyncHandler(async (req, res) => {
         apiKey: 'lm-studio',
         baseURL: lmStudioBaseUrl
       });
-      testModel = lmStudioModel || 'local-model';
+      // Use provided model or fall back to environment variable
+      testModel = lmStudioModel || env.lmStudioModel;
+      if (!testModel) {
+        throw new ApiError(400, 'MISSING_MODEL', 'Model name is required. Specify a model or use the one configured in .env');
+      }
     } else {
       // openrouter
       if (!openRouterApiKey) {
@@ -52,7 +56,11 @@ router.post('/validate-llm', asyncHandler(async (req, res) => {
         apiKey: openRouterApiKey,
         baseURL: 'https://openrouter.ai/api/v1'
       });
-      testModel = openRouterModel || 'meta-llama/llama-3.2-3b-instruct:free';
+      // Use provided model or fall back to environment variable
+      testModel = openRouterModel || env.openRouterModel;
+      if (!testModel) {
+        throw new ApiError(400, 'MISSING_MODEL', 'Model name is required. Specify a model or use the one configured in .env');
+      }
     }
 
     // Try to list models (lightweight test call)

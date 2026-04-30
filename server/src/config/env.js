@@ -21,7 +21,7 @@ export const env = {
   openRouterSiteName: process.env.OPENROUTER_SITE_NAME || 'LuminaQuest',
   lmStudioBaseUrl: process.env.LMSTUDIO_BASE_URL || 'http://127.0.0.1:1234/v1',
   lmStudioApiKey: process.env.LMSTUDIO_API_KEY || 'lm-studio',
-  lmStudioModel: process.env.LMSTUDIO_MODEL || 'local-model',
+  lmStudioModel: process.env.LMSTUDIO_MODEL, // No fallback - must be configured
   langfuseHost: process.env.LANGFUSE_HOST || '',
   langfusePublicKey: process.env.LANGFUSE_PUBLIC_KEY || '',
   langfuseSecretKey: process.env.LANGFUSE_SECRET_KEY || '',
