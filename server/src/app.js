@@ -5,6 +5,7 @@ import authRoutes from './routes/authRoutes.js';
 import gameRoutes from './routes/gameRoutes.js';
 import sessionRoutes from './routes/sessionRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import onboardingRoutes from './routes/onboardingRoutes.js';
 import { env } from './config/env.js';
 import { getDbStatus } from './config/db.js';
 import { ApiError } from './errors/ApiError.js';
@@ -64,6 +65,7 @@ api.use('/auth', authRateLimiter, authRoutes);
 api.use('/games', gameRoutes);
 api.use('/sessions', sessionRoutes);
 api.use('/admin', adminRoutes);
+api.use('/onboarding', onboardingRoutes);
 
 app.use('/api', api);
 app.use('/api/v1', api);
