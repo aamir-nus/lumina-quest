@@ -79,10 +79,22 @@ export function OnboardingWizard({ onComplete }) {
   });
 
   // Initialize with server defaults
-  const [lmStudioUrl, setLmStudioUrl] = useState(defaultConfig?.defaultLmStudioBaseUrl || 'http://127.0.0.1:1234/v1');
-  const [lmStudioModel, setLmStudioModel] = useState(defaultConfig?.defaultLmStudioModel || '');
+  const [lmStudioUrl, setLmStudioUrl] = useState('http://127.0.0.1:1234/v1');
+  const [lmStudioModel, setLmStudioModel] = useState('');
   const [openRouterKey, setOpenRouterKey] = useState('');
   const [validationResult, setValidationResult] = useState(null);
+
+  // Update form when server defaults load
+  useEffect(() => {
+    if (defaultConfig) {
+      if (defaultConfig.defaultLmStudioBaseUrl) {
+        setLmStudioUrl(defaultConfig.defaultLmStudioBaseUrl);
+      }
+      if (defaultConfig.defaultLmStudioModel) {
+        setLmStudioModel(defaultConfig.defaultLmStudioModel);
+      }
+    }
+  }, [defaultConfig]);
 
   const validateMutation = useMutation({
     mutationFn: async (config) => {
