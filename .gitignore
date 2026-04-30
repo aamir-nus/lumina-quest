@@ -219,3 +219,17 @@ docs/*_EXECUTION.md
 docs/*_HARDENING.md
 docs/*_CHECKLIST.md
 docs/*_REPORT.md
+.DS_Store
+
+# Project documentation markdown files (kept local, not in repo)
+CHANGELOG.md
+CLAUDE.md
+CODING GUIDELINES.md
+DEVELOPMENT.md
+example.html
+game development idea.txt
+image/
+
+# Sound system (not currently integrated)
+web/src/hooks/
+web/public/sounds/
