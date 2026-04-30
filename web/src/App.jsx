@@ -61,8 +61,13 @@ export default function App() {
 
   // Show onboarding wizard first (before auth check)
   // This allows LLM setup before any other functionality
+  console.log('[APP] Render check: showOnboarding =', showOnboarding);
   if (showOnboarding) {
-    return <OnboardingWizard onComplete={() => setShowOnboarding(false)} />;
+    return <OnboardingWizard onComplete={() => {
+      console.log('[APP] onComplete called, setting showOnboarding to false');
+      setShowOnboarding(false);
+      console.log('[APP] showOnboarding state updated');
+    }} />;
   }
 
   // Not authenticated - show login screen

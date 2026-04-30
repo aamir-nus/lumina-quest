@@ -380,7 +380,7 @@ export function OnboardingWizard({ onComplete }) {
         )}
 
         {step === 'complete' && (
-          <div className="onboarding-step fade-in">
+          <div className="onboarding-step">
             <div className="step-content">
               <div className="success-icon">✓</div>
               <h2>You're All Set!</h2>
