@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from './api';
 import { AuthPanel } from './components/AuthPanel';
 import { AdminPanel } from './components/AdminPanel';
@@ -28,6 +28,22 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
 
   const me = useMemo(() => auth?.user || null, [auth]);
+
+  // Stable ref for onboarding completion callback to avoid HMR staleness
+  const handleOnboardingCompleteRef = useRef(() => setShowOnboarding(false));
+  handleOnboardingCompleteRef.current = () => {
+    console.log('[APP] onComplete called, setting showOnboarding to false');
+    setShowOnboarding(false);
+    console.log('[APP] showOnboarding state updated');
+  };
+
+  // Stable ref for admin onboarding completion
+  const handleAdminOnboardingCompleteRef = useRef(() => {});
+  handleAdminOnboardingCompleteRef.current = () => {
+    console.log('[APP] Admin onboarding complete');
+    markAdminOnboardingShown();
+    setShowOnboarding(false);
+  };
 
   useEffect(() => {
     let active = true;
@@ -63,11 +79,7 @@ export default function App() {
   // This allows LLM setup before any other functionality
   console.log('[APP] Render check: showOnboarding =', showOnboarding);
   if (showOnboarding) {
-    return <OnboardingWizard onComplete={() => {
-      console.log('[APP] onComplete called, setting showOnboarding to false');
-      setShowOnboarding(false);
-      console.log('[APP] showOnboarding state updated');
-    }} />;
+    return <OnboardingWizard onComplete={() => handleOnboardingCompleteRef.current()} />;
   }
 
   // Not authenticated - show login screen
@@ -112,7 +124,7 @@ export default function App() {
 
   // Admin users: always show onboarding once per session (for demo purposes)
   if (me?.role === 'admin' && shouldShowAdminOnboarding() && !showOnboarding) {
-    return <OnboardingWizard onComplete={() => { markAdminOnboardingShown(); setShowOnboarding(false); }} />;
+    return <OnboardingWizard onComplete={() => handleAdminOnboardingCompleteRef.current()} />;
   }
 
   // Authenticated user view
