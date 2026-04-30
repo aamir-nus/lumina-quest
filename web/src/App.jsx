@@ -3,11 +3,29 @@ import { api } from './api';
 import { AuthPanel } from './components/AuthPanel';
 import { AdminPanel } from './components/AdminPanel';
 import { PlayerPanel } from './components/PlayerPanel';
+import { OnboardingWizard, isOnboardingCompleted, clearOnboardingState, shouldShowAdminOnboarding, markAdminOnboardingShown } from './components/OnboardingWizard';
+
+// Developer helper: allow re-running onboarding from browser console
+if (typeof window !== 'undefined') {
+  window.luminaQuest = {
+    rerunOnboarding: () => {
+      clearOnboardingState();
+      window.location.reload();
+    },
+    showOnboarding: () => {
+      clearOnboardingState();
+      window.location.reload();
+    }
+  };
+  console.log('🎮 LuminaQuest Dev Tools: window.luminaQuest.rerunOnboarding() to re-run setup');
+}
 
 export default function App() {
   const [auth, setAuth] = useState(null);
   const [playtestSessionId, setPlaytestSessionId] = useState('');
   const [adminTab, setAdminTab] = useState('player-forge'); // 'player-forge' | 'user-journey'
+  const [showOnboarding, setShowOnboarding] = useState(!isOnboardingCompleted());
+  const [showSettings, setShowSettings] = useState(false);
 
   const me = useMemo(() => auth?.user || null, [auth]);
 
@@ -33,7 +51,19 @@ export default function App() {
     api.post('/auth/logout').catch(() => {});
     setAuth(null);
     setAdminTab('player-forge');
+    // Reset admin onboarding session flag on logout
+    try {
+      sessionStorage.removeItem('luminaquest_onboarding_shown_this_session');
+    } catch {
+      // Ignore
+    }
   };
+
+  // Show onboarding wizard first (before auth check)
+  // This allows LLM setup before any other functionality
+  if (showOnboarding) {
+    return <OnboardingWizard onComplete={() => setShowOnboarding(false)} />;
+  }
 
   // Not authenticated - show login screen
   if (!me) {
@@ -60,14 +90,73 @@ export default function App() {
         </header>
         <div className="auth-container">
           <AuthPanel onAuth={onAuth} />
+          {!isOnboardingCompleted() && (
+            <p className="onboarding-hint">
+              First time? <button type="button" className="text-link" onClick={() => setShowOnboarding(true)}>Configure your AI settings</button>
+            </p>
+          )}
+          {isOnboardingCompleted() && (
+            <p className="onboarding-hint">
+              Want to reconfigure AI? <button type="button" className="text-link" onClick={() => { clearOnboardingState(); setShowOnboarding(true); }}>Run onboarding again</button>
+            </p>
+          )}
         </div>
       </main>
     );
   }
 
+  // Admin users: always show onboarding once per session (for demo purposes)
+  if (me?.role === 'admin' && shouldShowAdminOnboarding() && !showOnboarding) {
+    return <OnboardingWizard onComplete={() => { markAdminOnboardingShown(); setShowOnboarding(false); }} />;
+  }
+
   // Authenticated user view
   return (
     <main>
+      {showSettings && (
+        <div className="settings-modal" onClick={() => setShowSettings(false)}>
+          <div className="settings-content" onClick={(e) => e.stopPropagation()}>
+            <h2>LLM Settings</h2>
+            <p className="settings-description">
+              Configure your AI provider for game authoring and free-form input resolution.
+            </p>
+
+            <div className="settings-info">
+              <h3>Current Configuration</h3>
+              <p><strong>Provider:</strong> {localStorage.getItem('luminaquest_llm_provider') || 'lmstudio'}</p>
+              <p><strong>URL:</strong> {localStorage.getItem('luminaquest_llm_url') || 'http://127.0.0.1:1234/v1'}</p>
+              <p><strong>Model:</strong> {localStorage.getItem('luminaquest_llm_model') || 'google/gemma-3-4b'}</p>
+            </div>
+
+            <div className="settings-actions">
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => {
+                  setShowSettings(false);
+                  setShowOnboarding(true);
+                }}
+              >
+                Re-run Onboarding Wizard
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setShowSettings(false)}
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="settings-hint">
+              <p className="muted">
+                💡 Tip: You can also re-run onboarding by opening browser console and typing:
+              </p>
+              <code>window.luminaQuest.rerunOnboarding()</code>
+            </div>
+          </div>
+        </div>
+      )}
       <header>
         <div className="header-left">
           <h1 className="compact-title">LuminaQuest <span className="beta-badge">[beta]</span></h1>
@@ -93,6 +182,14 @@ export default function App() {
               </button>
             </div>
           )}
+          <button
+            type="button"
+            className="settings-button"
+            onClick={() => setShowSettings(true)}
+            title="LLM Settings"
+          >
+            ⚙️ Settings
+          </button>
           <span className="user-badge">{me.email}</span>
           <button onClick={logout}>Logout</button>
         </div>
