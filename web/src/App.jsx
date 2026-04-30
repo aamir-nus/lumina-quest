@@ -25,6 +25,7 @@ export default function App() {
   const [playtestSessionId, setPlaytestSessionId] = useState('');
   const [adminTab, setAdminTab] = useState('player-forge'); // 'player-forge' | 'user-journey'
   const [showOnboarding, setShowOnboarding] = useState(!isOnboardingCompleted());
+  const [adminOnboardingPending, setAdminOnboardingPending] = useState(shouldShowAdminOnboarding());
   const [showSettings, setShowSettings] = useState(false);
 
   const me = useMemo(() => auth?.user || null, [auth]);
@@ -42,6 +43,7 @@ export default function App() {
   handleAdminOnboardingCompleteRef.current = () => {
     console.log('[APP] Admin onboarding complete');
     markAdminOnboardingShown();
+    setAdminOnboardingPending(false);
     setShowOnboarding(false);
   };
 
@@ -61,6 +63,9 @@ export default function App() {
 
   const onAuth = (nextAuth) => {
     setAuth({ user: nextAuth.user });
+    if (nextAuth.user?.role === 'admin') {
+      setAdminOnboardingPending(shouldShowAdminOnboarding());
+    }
   };
 
   const logout = () => {
@@ -73,6 +78,7 @@ export default function App() {
     } catch {
       // Ignore
     }
+    setAdminOnboardingPending(true);
   };
 
   // Show onboarding wizard first (before auth check)
@@ -123,7 +129,7 @@ export default function App() {
   }
 
   // Admin users: always show onboarding once per session (for demo purposes)
-  if (me?.role === 'admin' && shouldShowAdminOnboarding() && !showOnboarding) {
+  if (me?.role === 'admin' && adminOnboardingPending && !showOnboarding) {
     return <OnboardingWizard onComplete={() => handleAdminOnboardingCompleteRef.current()} />;
   }
 
