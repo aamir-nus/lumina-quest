@@ -1,4 +1,5 @@
-main {
+/* Main content area (authenticated view only) */
+main:not(.login-screen):not(.onboarding-screen) {
   max-width: 1300px;
   margin: 0 auto;
   padding: 24px;
