@@ -172,7 +172,8 @@ export function OnboardingWizard({ onComplete }) {
       }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [step, onComplete]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
 
   return (
     <main className="onboarding-screen">
