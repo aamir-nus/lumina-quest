@@ -157,7 +157,11 @@ export function OnboardingWizard({ onComplete }) {
     }
     setStep('complete');
     // Call onComplete after delay
-    setTimeout(() => onComplete(), 1500);
+    console.log('[ONBOARDING] Scheduling onComplete callback in 1.5s');
+    setTimeout(() => {
+      console.log('[ONBOARDING] Calling onComplete callback');
+      onComplete();
+    }, 1500);
   };
 
   const handleSkip = () => {
