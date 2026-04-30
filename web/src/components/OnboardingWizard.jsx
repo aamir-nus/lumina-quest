@@ -144,7 +144,6 @@ export function OnboardingWizard({ onComplete }) {
       console.warn('Failed to save LLM config:', error);
     }
     setStep('complete');
-    setTimeout(() => onComplete(), 1500);
   };
 
   const handleSkip = () => {
@@ -152,6 +151,16 @@ export function OnboardingWizard({ onComplete }) {
     setOnboardingCompleted();
     onComplete();
   };
+
+  // When entering complete step, wait 1.5s then finish
+  useEffect(() => {
+    if (step === 'complete') {
+      const timer = setTimeout(() => {
+        onComplete();
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [step, onComplete]);
 
   return (
     <main className="onboarding-screen">
