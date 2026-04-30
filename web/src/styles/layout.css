@@ -1,4 +1,5 @@
-main {
+/* Main content area (authenticated view only) */
+main:not(.login-screen):not(.onboarding-screen) {
   max-width: 1300px;
   margin: 0 auto;
   padding: 24px;
@@ -165,7 +166,7 @@ main {
 
 .auth-container {
   width: 100%;
-  max-width: 400px;
+  max-width: 500px;
   display: flex;
   justify-content: center;
 }

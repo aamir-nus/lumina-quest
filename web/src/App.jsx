@@ -1,15 +1,52 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from './api';
 import { AuthPanel } from './components/AuthPanel';
 import { AdminPanel } from './components/AdminPanel';
 import { PlayerPanel } from './components/PlayerPanel';
+import { OnboardingWizard, isOnboardingCompleted, clearAdminOnboardingShown, clearOnboardingState, getStoredLlmSettings, shouldShowAdminOnboarding, markAdminOnboardingShown } from './components/OnboardingWizard';
+
+// Developer helper: allow re-running onboarding from browser console
+if (typeof window !== 'undefined') {
+  window.luminaQuest = {
+    rerunOnboarding: () => {
+      clearOnboardingState();
+      window.location.reload();
+    },
+    showOnboarding: () => {
+      clearOnboardingState();
+      window.location.reload();
+    }
+  };
+  console.log('🎮 LuminaQuest Dev Tools: window.luminaQuest.rerunOnboarding() to re-run setup');
+}
 
 export default function App() {
   const [auth, setAuth] = useState(null);
   const [playtestSessionId, setPlaytestSessionId] = useState('');
   const [adminTab, setAdminTab] = useState('player-forge'); // 'player-forge' | 'user-journey'
+  const [showOnboarding, setShowOnboarding] = useState(!isOnboardingCompleted());
+  const [adminOnboardingPending, setAdminOnboardingPending] = useState(shouldShowAdminOnboarding());
+  const [showSettings, setShowSettings] = useState(false);
+  const llmSettings = getStoredLlmSettings();
 
   const me = useMemo(() => auth?.user || null, [auth]);
+
+  // Stable ref for onboarding completion callback to avoid HMR staleness
+  const handleOnboardingCompleteRef = useRef(() => setShowOnboarding(false));
+  handleOnboardingCompleteRef.current = () => {
+    console.log('[APP] onComplete called, setting showOnboarding to false');
+    setShowOnboarding(false);
+    console.log('[APP] showOnboarding state updated');
+  };
+
+  // Stable ref for admin onboarding completion
+  const handleAdminOnboardingCompleteRef = useRef(() => {});
+  handleAdminOnboardingCompleteRef.current = () => {
+    console.log('[APP] Admin onboarding complete');
+    markAdminOnboardingShown();
+    setAdminOnboardingPending(false);
+    setShowOnboarding(false);
+  };
 
   useEffect(() => {
     let active = true;
@@ -27,13 +64,25 @@ export default function App() {
 
   const onAuth = (nextAuth) => {
     setAuth({ user: nextAuth.user });
+    if (nextAuth.user?.role === 'admin') {
+      setAdminOnboardingPending(shouldShowAdminOnboarding());
+    }
   };
 
   const logout = () => {
     api.post('/auth/logout').catch(() => {});
     setAuth(null);
     setAdminTab('player-forge');
+    clearAdminOnboardingShown();
+    setAdminOnboardingPending(true);
   };
+
+  // Show onboarding wizard first (before auth check)
+  // This allows LLM setup before any other functionality
+  console.log('[APP] Render check: showOnboarding =', showOnboarding);
+  if (showOnboarding) {
+    return <OnboardingWizard onComplete={() => handleOnboardingCompleteRef.current()} />;
+  }
 
   // Not authenticated - show login screen
   if (!me) {
@@ -60,14 +109,73 @@ export default function App() {
         </header>
         <div className="auth-container">
           <AuthPanel onAuth={onAuth} />
+          {!isOnboardingCompleted() && (
+            <p className="onboarding-hint">
+              First time? <button type="button" className="text-link" onClick={() => setShowOnboarding(true)}>Configure your AI settings</button>
+            </p>
+          )}
+          {isOnboardingCompleted() && (
+            <p className="onboarding-hint">
+              Want to reconfigure AI? <button type="button" className="text-link" onClick={() => { clearOnboardingState(); setShowOnboarding(true); }}>Run onboarding again</button>
+            </p>
+          )}
         </div>
       </main>
     );
   }
 
+  // Admin users: always show onboarding once per session (for demo purposes)
+  if (me?.role === 'admin' && adminOnboardingPending && !showOnboarding) {
+    return <OnboardingWizard onComplete={() => handleAdminOnboardingCompleteRef.current()} />;
+  }
+
   // Authenticated user view
   return (
     <main>
+      {showSettings && (
+        <div className="settings-modal" onClick={() => setShowSettings(false)}>
+          <div className="settings-content" onClick={(e) => e.stopPropagation()}>
+            <h2>LLM Settings</h2>
+            <p className="settings-description">
+              Configure your AI provider for game authoring and free-form input resolution.
+            </p>
+
+            <div className="settings-info">
+              <h3>Current Configuration</h3>
+              <p><strong>Provider:</strong> {llmSettings.provider}</p>
+              <p><strong>URL:</strong> {llmSettings.lmStudioUrl}</p>
+              <p><strong>Model:</strong> {llmSettings.lmStudioModel}</p>
+            </div>
+
+            <div className="settings-actions">
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => {
+                  setShowSettings(false);
+                  setShowOnboarding(true);
+                }}
+              >
+                Re-run Onboarding Wizard
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setShowSettings(false)}
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="settings-hint">
+              <p className="muted">
+                💡 Tip: You can also re-run onboarding by opening browser console and typing:
+              </p>
+              <code>window.luminaQuest.rerunOnboarding()</code>
+            </div>
+          </div>
+        </div>
+      )}
       <header>
         <div className="header-left">
           <h1 className="compact-title">LuminaQuest <span className="beta-badge">[beta]</span></h1>
@@ -93,6 +201,14 @@ export default function App() {
               </button>
             </div>
           )}
+          <button
+            type="button"
+            className="settings-button"
+            onClick={() => setShowSettings(true)}
+            title="LLM Settings"
+          >
+            ⚙️ Settings
+          </button>
           <span className="user-badge">{me.email}</span>
           <button onClick={logout}>Logout</button>
         </div>

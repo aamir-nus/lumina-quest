@@ -326,6 +326,17 @@ POST /api/games/game-id/generate-options
 - `origin` is set to `"ai_generated"` for AI-created options
 - Partial generation is acceptable (some scenes may remain pending)
 - Sets `generationState.status` to `"complete"` or `"manual_required"`
+- **Historical Context**: Options are generated with full awareness of:
+  - All previous scenes and their narratives
+  - All options from previous scenes
+  - Current scene and next scene
+  - This ensures narrative consistency across the entire game
+
+**Graceful Degradation:**
+- If AI generation fails for any scene, the game remains playable
+- Users see friendly message: "The magic has run out - you'll have to forge ahead alone!"
+- Manual option authoring is always available via the game editor
+- No UI/UX breaking - the game flow continues smoothly
 
 ### Generate Options (Single Scene)
 
@@ -671,6 +682,49 @@ classifyRoute() → Can map to avenue? → YES → generateNarration() → Respo
 | Mode | LLM Calls | Tokens | Latency | Scene Change |
 | ---- | --------- | ------ | ------- | ------------ |
 | Direct Selection | 0 | 0 | <100ms | Yes |
+
+### Option Generation with Historical Context
+
+When generating player options for scenes, the LLM receives full historical context to ensure narrative consistency:
+
+**Prompt Structure:**
+```
+=== STORY SO FAR ===
+Beat 1: [narrative summary]
+  Available options were:
+  - "Option A" (success)
+  - "Option B" (partial)
+
+Beat 2: [narrative summary]
+  Available options were:
+  - "Option C" (success)
+  - "Option D" (fail)
+
+=== CURRENT BEAT ===
+Current beat narrative: [narrative]
+Current beat goal: [goal]
+Next intended beat: [next scene]
+Fail ending summary: [fail scene]
+
+[Option requirements and JSON schema]
+
+=== NARRATIVE CONSISTENCY ===
+- Options should reference and build upon the story so far
+- Consider what the player has already experienced when crafting new choices
+- Maintain continuity with previous beats while offering meaningful progression
+```
+
+**Benefits:**
+- **Coherent Storylines**: Options reference previous events and choices
+- **Meaningful Progression**: Each choice feels connected to the narrative arc
+- **Contextual Awareness**: AI understands the full story context when generating options
+- **Consistent Tone**: Maintains narrative voice across all scenes
+
+**Implementation:**
+- Options are generated sequentially in story order
+- Each scene generation includes all previous scenes and their options
+- Ensures the "story so far" is always available for context
+- Works for both full game generation and single scene regeneration
 | Exact Match | 0 | 0 | <100ms | Yes |
 | Freeform (Mapped) | 2 | ~200-500 | 3-8s | Yes |
 | Freeform (Invalid) | 1 | ~50-100 | 1-3s | No (retry) |
