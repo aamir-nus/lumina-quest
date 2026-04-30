@@ -27,6 +27,30 @@ flowchart LR
 - **Secrets Detection**: Pre-commit hooks using Gitleaks to prevent accidental commits of credentials
 - **Docker Support**: Single-command startup with full stack containerization
 
+## Problem Statement
+
+LuminaQuest explores a relevant software problem: how to combine authored narrative control with AI-assisted interaction without letting the experience collapse into non-deterministic chaos. The project targets a space that should remain relevant over the next several years as teams continue experimenting with LLM-assisted products but still need predictable structure, moderation boundaries, and debuggable system behavior.
+
+## Frontend Features
+
+- Guided onboarding wizard for LLM provider setup
+- Role-based login flow for `admin` and `user`
+- Admin workspace with `Player Forge` and `User Journey` views
+- Game authoring, graph inspection, analysis, and playtest flow
+- 8-bit style presentation layer with scene transitions and ending states
+- React Query data fetching with loading and error handling
+- Shared runtime settings flow across Docker and Vite local development
+
+## Backend Features
+
+- Express + MongoDB backend with persistent game, user, and session data
+- Cookie-first JWT authentication with session-aware admin/user flows
+- Deterministic session engine for authored scene progression
+- LLM provider abstraction for `openrouter` and `lmstudio`
+- Server-side validation, structured API errors, and request tracing
+- Security middleware including helmet, rate limiting, and input sanitization
+- Docker Compose bootstrap and smoke-test oriented startup path
+
 ## Quick Start
 
 ### Option 1: Docker Compose (Recommended)
@@ -43,6 +67,8 @@ docker compose down
 ```
 
 Access the application at **http://localhost:8080**
+
+![1777562578228](image/README/1777562578228.png)
 
 **Default Admin Credentials:**
 
@@ -74,6 +100,9 @@ On first visit, you'll see an onboarding wizard to configure your LLM provider:
 
 The onboarding settings are stored in your browser session. You can re-run onboarding by clearing the `luminaquest_onboarding_completed` key in localStorage.
 
+Docker Compose and `npm run dev:*` are intended to share the same root `.env`. Docker overrides only
+container-specific addresses internally, so you should not need to flip your `.env` back and forth.
+
 ### Option 2: Development Mode
 
 ```bash
@@ -86,6 +115,7 @@ docker compose up -d mongo
 # Set up environment
 cp .env.example .env
 # Edit .env and set JWT_SECRET (24+ characters)
+# Keep CLIENT_ORIGIN as both localhost ports so Docker and Vite dev both work
 
 # Start server and web in separate terminals
 npm run dev:server
@@ -104,13 +134,15 @@ PORT=4000
 NODE_ENV=production
 
 # Database
-MONGO_URI=mongodb://mongo:27017/luminaquest
+# In local dev, keep MONGO_URI pointed at localhost.
+# Docker Compose overrides it internally to mongodb://mongo:27017/luminaquest
+MONGO_URI=mongodb://127.0.0.1:27017/luminaquest
 
 # Authentication
 JWT_SECRET=your-secret-key-min-24-chars
 
 # CORS
-CLIENT_ORIGIN=http://localhost:8080
+CLIENT_ORIGIN=http://localhost:5173,http://localhost:8080
 CORS_ALLOW_NO_ORIGIN=false
 ```
 
@@ -129,12 +161,13 @@ LMSTUDIO_API_KEY=lm-studio
 LMSTUDIO_MODEL=google/gemma-3-4b
 ```
 
-**For Docker Compose**, use `host.docker.internal` to access your local LLM from within containers:
+**For Docker Compose**, the server container automatically overrides LM Studio to use
+`host.docker.internal`, so your shared `.env` can stay pointed at `127.0.0.1` for local dev:
 
 ```bash
-# .env file for docker compose
+# Shared .env for both local dev and docker compose
 LLM_PROVIDER=lmstudio
-LMSTUDIO_BASE_URL=http://host.docker.internal:1234/v1
+LMSTUDIO_BASE_URL=http://127.0.0.1:1234/v1
 LMSTUDIO_MODEL=google/gemma-3-4b
 ```
 
@@ -153,6 +186,12 @@ OPENROUTER_MODEL=openrouter/free
 Instead of manually configuring environment variables, you can use the built-in onboarding wizard on first launch. The wizard validates your LLM connection and stores the configuration in your browser session.
 
 **Note**: Onboarding-configured providers are session-only and won't persist across browser restarts. For persistent configuration, use environment variables.
+
+### Shared Config Strategy
+
+- Keep one root `.env` for values that should work in both modes.
+- Use `CLIENT_ORIGIN=http://localhost:5173,http://localhost:8080` so auth and CORS work from Vite and Docker.
+- Let Docker Compose override only container-specific addresses such as `MONGO_URI` and `LMSTUDIO_BASE_URL`.
 
 ## Auth + API Notes
 
@@ -207,6 +246,16 @@ See [for-admin.md](./for-admin.md) for complete admin documentation including:
 
 - [API Reference](docs/API.md) - Complete API contract and endpoint documentation
 - [UI Mockups](docs/UI_MOCKUPS.md) - Mermaid diagrams of workflows and architecture
+- [Project Requirements](PROJECT_REQUIREMENTS.md) - Reformatted course rubric and project-facing requirements summary
+- [Design Review](docs/Design%20Review.md) - Product and UI review against usability/design expectations
+- [FE Review & BE Plan](docs/FE%20Review%20%26%20BE%20Plan.md) - Frontend findings and backend follow-up plan
+
+## Evaluation Notes
+
+- Architecture, setup, and major flows are documented in this README and the docs linked above.
+- The project includes both a substantial backend stack and distinctive frontend presentation work.
+- Docker and local development are intended to remain parity-aligned to support setup automation and usability.
+- Any borrowed code or external dependencies should be declared clearly here before final submission.
 
 ---
 
